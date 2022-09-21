@@ -10,6 +10,7 @@ import (
 type Scanner struct {
 	input *bufio.Reader
 	line  int
+	eof   bool
 }
 
 func New(input io.Reader) *Scanner {
@@ -19,8 +20,15 @@ func New(input io.Reader) *Scanner {
 	}
 }
 
-func (s *Scanner) nextToken() (Token, error) {
-	ch, _, err := s.input.ReadRune()
+func (s *Scanner) NextToken() (Token, error) {
+	if s.eof == true {
+		return newEndOfInputToken(), nil
+	}
+
+	ch, err := s.readRune()
+	if err == io.EOF {
+		return newEndOfInputToken(), nil
+	}
 	if err != nil {
 		return Token{}, err
 	}
@@ -87,6 +95,10 @@ func (s *Scanner) nextToken() (Token, error) {
 		return s.scanSymbolicName(ch)
 	}
 
+	if space(ch) {
+		return s.scanSpace(ch)
+	}
+
 	return Token{}, nil
 }
 
@@ -109,7 +121,10 @@ func (s *Scanner) scanSymbolicName(ch rune) (Token, error) {
 	b := strings.Builder{}
 	b.WriteRune(ch)
 	for {
-		ch, _, err := s.input.ReadRune()
+		ch, err := s.readRune()
+		if err == io.EOF {
+			break
+		}
 		if err != nil {
 			return Token{}, err
 		}
@@ -129,4 +144,48 @@ func (s *Scanner) scanSymbolicName(ch rune) (Token, error) {
 		literal: nil,
 		line:    s.line,
 	}, nil
+}
+
+func (s *Scanner) scanSpace(ch rune) (Token, error) {
+	b := strings.Builder{}
+	b.WriteRune(ch)
+	if ch == '\n' {
+		s.line = s.line + 1
+	}
+	for {
+		ch, err := s.readRune()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return Token{}, err
+		}
+		if space(ch) {
+			b.WriteRune(ch)
+			if ch == '\n' {
+				s.line = s.line + 1
+			}
+		} else {
+			s.input.UnreadRune()
+			break
+		}
+	}
+	return Token{
+		t:       WhiteSpace,
+		lexeme:  b.String(),
+		literal: nil,
+		line:    s.line,
+	}, nil
+}
+
+func (s *Scanner) readRune() (rune, error) {
+	ch, _, err := s.input.ReadRune()
+	if err == io.EOF {
+		s.eof = true
+		return ' ', err
+	}
+	if err != nil {
+		return ' ', err
+	}
+	return ch, nil
 }

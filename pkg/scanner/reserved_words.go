@@ -11,13 +11,14 @@ type tokenInfo struct {
 
 var reservedWords = tokenMap{
 	"create":   tokenInfo{Create, "CREATE"},
-	"delete":   tokenInfo{Create, "DELETE"},
-	"detach":   tokenInfo{Create, "DETACH"},
-	"exists":   tokenInfo{Create, "EXISTS"},
-	"match":    tokenInfo{Create, "MATCH"},
-	"merge":    tokenInfo{Create, "MERGE"},
-	"optional": tokenInfo{Create, "OPTIONAL"},
-	"remove":   tokenInfo{Create, "REMOVE"},
+	"delete":   tokenInfo{Delete, "DELETE"},
+	"detach":   tokenInfo{Detach, "DETACH"},
+	"exists":   tokenInfo{Exists, "EXISTS"},
+	"match":    tokenInfo{Match, "MATCH"},
+	"merge":    tokenInfo{Merge, "MERGE"},
+	"optional": tokenInfo{Optional, "OPTIONAL"},
+	"remove":   tokenInfo{Remove, "REMOVE"},
+	"return":   tokenInfo{Return, "RETURN"},
 }
 
 func (m tokenMap) token(symbolName string, line int) (Token, bool) {

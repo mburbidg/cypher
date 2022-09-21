@@ -3,7 +3,7 @@ package scanner
 type TokenType int
 
 const (
-	Period = iota
+	Period TokenType = iota
 	OpenParen
 	CloseParen
 	OpenBrace

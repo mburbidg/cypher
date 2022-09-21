@@ -21,3 +21,9 @@ func newKeywordToken(t TokenType, lexeme string, line int) Token {
 		line:   line,
 	}
 }
+
+func newEndOfInputToken() Token {
+	return Token{
+		t: EndOfInput,
+	}
+}
