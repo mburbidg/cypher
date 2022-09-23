@@ -10,49 +10,13 @@ import (
 
 func TestScanner(t *testing.T) {
 	s := New(bytes.NewBufferString("Create"))
-	token, err := s.NextToken()
-	assert.NoError(t, err)
-	assert.Equal(t, Create, token.t)
+	assertTokens(t, []TokenType{Create, EndOfInput}, s)
 
 	s = New(bytes.NewBufferString("+"))
-	token, err = s.NextToken()
-	assert.NoError(t, err)
-	assert.Equal(t, Plus, token.t)
+	assertTokens(t, []TokenType{Plus, EndOfInput}, s)
 
-	s = New(bytes.NewBufferString("MATCH (n) RETURN n"))
-	token, err = s.NextToken()
-	assert.NoError(t, err)
-	assert.Equal(t, Match, token.t)
-	token, err = s.NextToken()
-	assert.NoError(t, err)
-	assert.Equal(t, WhiteSpace, token.t)
-	token, err = s.NextToken()
-	assert.NoError(t, err)
-	assert.Equal(t, OpenParen, token.t)
-	token, err = s.NextToken()
-	assert.NoError(t, err)
-	assert.Equal(t, SymbolName, token.t)
-	assert.Equal(t, "n", token.lexeme)
-	token, err = s.NextToken()
-	assert.NoError(t, err)
-	assert.Equal(t, CloseParen, token.t)
-	token, err = s.NextToken()
-	assert.NoError(t, err)
-	assert.Equal(t, WhiteSpace, token.t)
-	token, err = s.NextToken()
-	assert.NoError(t, err)
-	assert.Equal(t, Return, token.t)
-	token, err = s.NextToken()
-	assert.NoError(t, err)
-	assert.Equal(t, WhiteSpace, token.t)
-	token, err = s.NextToken()
-	assert.NoError(t, err)
-	assert.Equal(t, SymbolName, token.t)
-	assert.Equal(t, "n", token.lexeme)
-	token, err = s.NextToken()
-	assert.NoError(t, err)
-	assert.Equal(t, EndOfInput, token.t)
-
+	s = New(bytes.NewBufferString("MATCH (n) RETURN n WHERE n.foo = 1"))
+	assertTokens(t, []TokenType{Match, OpenParen, SymbolName, CloseParen, Return, SymbolName, Where, SymbolName, Period, SymbolName, Equal, Integer, EndOfInput}, s)
 }
 
 func TestIt(t *testing.T) {
@@ -98,3 +62,13 @@ func TestIt(t *testing.T) {
 		fmt.Println(err)
 	}
 }
+
+func assertTokens(t *testing.T, expected []TokenType, scanner *Scanner) {
+	for _, tokenType := range expected {
+		token := scanner.NextToken()
+		assert.Equal(t, tokenType, token.t)
+	}
+}
+
+var query = "MATCH (n) RETURN n WHERE n.foo = 1"
+var expected = []TokenType{Match, OpenParen, SymbolName, CloseParen, Return, SymbolName, Where, SymbolName, Period, SymbolName, Equal, Integer}

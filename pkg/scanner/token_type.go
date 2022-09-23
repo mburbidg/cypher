@@ -24,7 +24,6 @@ const (
 	GreaterThanOrEqual
 	DollarSign
 
-	WhiteSpace
 	SymbolName
 	Double
 	Integer
