@@ -8,15 +8,44 @@ import (
 	"testing"
 )
 
+type errorMsg struct {
+	line int
+	msg  string
+}
+
+type testReporter struct {
+	errors []errorMsg
+}
+
+func newTestReporter() *testReporter {
+	return &testReporter{
+		errors: make([]errorMsg, 0, 10),
+	}
+}
+
+func (r *testReporter) Error(line int, msg string) {
+	r.errors = append(r.errors, errorMsg{
+		line: line,
+		msg:  msg,
+	})
+}
+
 func TestScanner(t *testing.T) {
-	s := New(bytes.NewBufferString("Create"))
+	s := New(bytes.NewBufferString("Create"), newTestReporter())
 	assertTokens(t, []TokenType{Create, EndOfInput}, s)
 
-	s = New(bytes.NewBufferString("+"))
+	s = New(bytes.NewBufferString("+"), newTestReporter())
 	assertTokens(t, []TokenType{Plus, EndOfInput}, s)
 
-	s = New(bytes.NewBufferString("MATCH (n) RETURN n WHERE n.foo = 1"))
+	s = New(bytes.NewBufferString("MATCH (n) RETURN n WHERE n.foo = 1"), newTestReporter())
 	assertTokens(t, []TokenType{Match, OpenParen, SymbolName, CloseParen, Return, SymbolName, Where, SymbolName, Period, SymbolName, Equal, Integer, EndOfInput}, s)
+}
+
+func TestBogusNumber(t *testing.T) {
+	reporter := newTestReporter()
+	s := New(bytes.NewBufferString("1a 1.2"), reporter)
+	assertTokens(t, []TokenType{Error, Double, EndOfInput}, s)
+	assert.Equal(t, 1, len(reporter.errors))
 }
 
 func TestIt(t *testing.T) {
@@ -69,6 +98,3 @@ func assertTokens(t *testing.T, expected []TokenType, scanner *Scanner) {
 		assert.Equal(t, tokenType, token.t)
 	}
 }
-
-var query = "MATCH (n) RETURN n WHERE n.foo = 1"
-var expected = []TokenType{Match, OpenParen, SymbolName, CloseParen, Return, SymbolName, Where, SymbolName, Period, SymbolName, Equal, Integer}

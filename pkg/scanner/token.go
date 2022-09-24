@@ -51,3 +51,9 @@ func newNumberToken(t TokenType, lexeme string, line int) Token {
 	}
 	return Token{}
 }
+
+func newErrorToken() Token {
+	return Token{
+		t: Error,
+	}
+}

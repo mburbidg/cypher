@@ -2,6 +2,8 @@ package scanner
 
 import (
 	"bufio"
+	"fmt"
+	"github.com/mburbidg/cypher/pkg/utils"
 	"github.com/smasher164/xid"
 	"io"
 	"strings"
@@ -9,15 +11,17 @@ import (
 )
 
 type Scanner struct {
-	input *bufio.Reader
-	line  int
-	eof   bool
+	input    *bufio.Reader
+	reporter utils.Reporter
+	line     int
+	eof      bool
 }
 
-func New(input io.Reader) *Scanner {
+func New(input io.Reader, reporter utils.Reporter) *Scanner {
 	return &Scanner{
-		input: bufio.NewReader(input),
-		line:  1,
+		input:    bufio.NewReader(input),
+		reporter: reporter,
+		line:     1,
 	}
 }
 
@@ -231,9 +235,26 @@ func (s *Scanner) scanNumber(ch rune) Token {
 		case ch == '.':
 			b.WriteRune(ch)
 			t = Double
-		default:
+		case space(ch):
 			_ = s.input.UnreadRune()
 			return newNumberToken(t, b.String(), s.line)
+		default:
+			s.reporter.Error(s.line, fmt.Sprintf("unexpected character '%s'", string(ch)))
+			s.consumeNonWhitespace()
+			return newErrorToken()
+		}
+	}
+}
+
+func (s *Scanner) consumeNonWhitespace() {
+	for {
+		ch, _, err := s.input.ReadRune()
+		if err != nil {
+			s.eof = true
+		}
+		if !space(ch) {
+			s.input.UnreadRune()
+			break
 		}
 	}
 }
