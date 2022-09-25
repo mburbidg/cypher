@@ -38,6 +38,14 @@ func (s *Scanner) NextToken() Token {
 
 	switch {
 	case ch == '.':
+		ch, _, err := s.input.ReadRune()
+		if err != nil {
+			return newEndOfInputToken()
+		}
+		if unicode.IsDigit(ch) {
+			_ = s.input.UnreadRune()
+			return s.scanNumber('.')
+		}
 		return newOperatorToken(Period, s.line)
 	case ch == '(':
 		return newOperatorToken(OpenParen, s.line)
@@ -225,6 +233,9 @@ func (s *Scanner) scanSymbolicName(ch rune) Token {
 
 func (s *Scanner) scanNumber(ch rune) Token {
 	t := Integer
+	if ch == '.' {
+		t = Double
+	}
 	b := strings.Builder{}
 	b.WriteRune(ch)
 	for {

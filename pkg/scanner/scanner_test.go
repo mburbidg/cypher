@@ -41,6 +41,11 @@ func TestScanner(t *testing.T) {
 	assertTokens(t, []TokenType{Match, OpenParen, SymbolName, CloseParen, Return, SymbolName, Where, SymbolName, Period, SymbolName, Equal, Integer, EndOfInput}, s)
 }
 
+func TestNumber(t *testing.T) {
+	s := New(bytes.NewBufferString("0 0.1 . .25"), newTestReporter())
+	assertTokens(t, []TokenType{Integer, Double, Period, Double, EndOfInput}, s)
+}
+
 func TestBogusNumber(t *testing.T) {
 	reporter := newTestReporter()
 	s := New(bytes.NewBufferString("1a 1.2"), reporter)
