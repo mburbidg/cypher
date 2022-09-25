@@ -48,6 +48,16 @@ func TestBogusNumber(t *testing.T) {
 	assert.Equal(t, 1, len(reporter.errors))
 }
 
+func TestString(t *testing.T) {
+	reporter := newTestReporter()
+	s := New(bytes.NewBufferString("\"This is a \\u00fa \\U032bca08 string.\\n\""), reporter)
+	assertTokens(t, []TokenType{String, EndOfInput}, s)
+	assert.Equal(t, 0, len(reporter.errors))
+	s = New(bytes.NewBufferString("'This is a \\u00fa \\U032bca08 string.\\n'"), reporter)
+	assertTokens(t, []TokenType{String, EndOfInput}, s)
+	assert.Equal(t, 0, len(reporter.errors))
+}
+
 func TestIt(t *testing.T) {
 	buf := bytes.NewBufferString("Create")
 	r := bufio.NewReader(buf)

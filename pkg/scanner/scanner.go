@@ -8,6 +8,7 @@ import (
 	"io"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 type Scanner struct {
@@ -115,6 +116,8 @@ func (s *Scanner) NextToken() Token {
 		return newOperatorToken(DollarSign, s.line)
 	case unicode.IsDigit(ch):
 		return s.scanNumber(ch)
+	case ch == '"', ch == '\'':
+		return s.scanString(ch)
 	case xid.Start(ch):
 		return s.scanSymbolicName(ch)
 	case space(ch):
@@ -239,11 +242,100 @@ func (s *Scanner) scanNumber(ch rune) Token {
 			_ = s.input.UnreadRune()
 			return newNumberToken(t, b.String(), s.line)
 		default:
+			b.WriteRune(ch)
 			s.reporter.Error(s.line, fmt.Sprintf("unexpected character '%s'", string(ch)))
 			s.consumeNonWhitespace()
-			return newErrorToken()
+			return newErrorToken(b.String())
 		}
 	}
+}
+
+func (s *Scanner) scanString(ch rune) Token {
+	startCh := ch
+	lexeme := strings.Builder{}
+	lexeme.WriteRune(startCh)
+	literal := strings.Builder{}
+	for {
+		ch, _, err := s.input.ReadRune()
+		if err != nil {
+			s.reporter.Error(s.line, fmt.Sprintf("expecting string end character '%s'", string(startCh)))
+			s.eof = true
+			return newErrorToken(lexeme.String())
+		}
+		switch {
+		case ch == startCh:
+			lexeme.WriteRune(ch)
+			return newStringToken(lexeme.String(), literal.String(), s.line)
+		case ch == '\\':
+			lexeme.WriteRune(ch)
+			literal.WriteRune(s.scanEscapeCharacter())
+		default:
+			lexeme.WriteRune(ch)
+			literal.WriteRune(ch)
+		}
+	}
+}
+
+func (s *Scanner) scanEscapeCharacter() rune {
+	ch, _, err := s.input.ReadRune()
+	if err != nil {
+		s.reporter.Error(s.line, fmt.Sprintf("incomplete character escape"))
+		s.eof = true
+		return 0
+	}
+	switch ch {
+	case '\'', '"':
+		return ch
+	case 'b':
+		return '\b'
+	case 'f':
+		return '\f'
+	case 'n':
+		return '\n'
+	case 'r':
+		return '\r'
+	case 't':
+		return '\t'
+	case 'u':
+		b := strings.Builder{}
+		b.WriteString("\\u")
+		for i := 0; i < 4; i++ {
+			ch, _, err := s.input.ReadRune()
+			if err != nil {
+				s.reporter.Error(s.line, fmt.Sprintf("incomplete character escape"))
+				s.eof = true
+				return 0
+			}
+			ok := unicode.In(ch, unicode.ASCII_Hex_Digit)
+			if !ok {
+				s.reporter.Error(s.line, fmt.Sprintf("invalid escaped unicode character"))
+				return 0
+			}
+			b.WriteRune(ch)
+		}
+		ch, _ := utf8.DecodeLastRuneInString(b.String())
+		return ch
+	case 'U':
+		b := strings.Builder{}
+		b.WriteString("\\U")
+		for i := 0; i < 8; i++ {
+			ch, _, err := s.input.ReadRune()
+			if err != nil {
+				s.reporter.Error(s.line, fmt.Sprintf("incomplete character escape"))
+				s.eof = true
+				return 0
+			}
+			ok := unicode.In(ch, unicode.ASCII_Hex_Digit)
+			if !ok {
+				s.reporter.Error(s.line, fmt.Sprintf("invalid escaped unicode character"))
+				return 0
+			}
+			b.WriteRune(ch)
+		}
+		ch, _ := utf8.DecodeLastRuneInString(b.String())
+		return ch
+	}
+	return 0
 }
 
 func (s *Scanner) consumeNonWhitespace() {
