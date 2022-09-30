@@ -31,19 +31,30 @@ func (r *testReporter) Error(line int, msg string) {
 }
 
 func TestScanner(t *testing.T) {
-	s := New(bytes.NewBufferString("Create"), newTestReporter())
-	assertTokens(t, []TokenType{Create, EndOfInput}, s)
-
-	s = New(bytes.NewBufferString("+"), newTestReporter())
-	assertTokens(t, []TokenType{Plus, EndOfInput}, s)
-
-	s = New(bytes.NewBufferString("MATCH (n) RETURN n WHERE n.foo = 1"), newTestReporter())
-	assertTokens(t, []TokenType{Match, OpenParen, SymbolName, CloseParen, Return, SymbolName, Where, SymbolName, Period, SymbolName, Equal, Integer, EndOfInput}, s)
 }
 
-func TestNumber(t *testing.T) {
-	s := New(bytes.NewBufferString("0 0.1 . .25"), newTestReporter())
-	assertTokens(t, []TokenType{Integer, Double, Period, Double, EndOfInput}, s)
+func TestNumbers(t *testing.T) {
+	tests := map[string]struct {
+		src    string
+		tokens []TokenType
+	}{
+		"zero":        {"0", []TokenType{Integer, EndOfInput}},
+		"integer":     {"240", []TokenType{Integer, EndOfInput}},
+		"integer:xa":  {"10a", []TokenType{Integer, Identifier, EndOfInput}},
+		"integer:0xa": {"0x3ae1", []TokenType{Integer, EndOfInput}},
+		"integer:0nn": {"0371", []TokenType{Integer, EndOfInput}},
+		"double:0.x":  {"0.1", []TokenType{Double, EndOfInput}},
+		"double:x.x":  {"25.1", []TokenType{Double, EndOfInput}},
+		"double:.x":   {".15", []TokenType{Double, EndOfInput}},
+		"double:x.":   {"14.", []TokenType{Error, EndOfInput}},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			s := New(bytes.NewBufferString(tc.src), newTestReporter())
+			assertTokens(t, tc.tokens, s)
+		})
+	}
 }
 
 func TestBogusNumber(t *testing.T) {

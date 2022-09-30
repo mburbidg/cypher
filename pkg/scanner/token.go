@@ -30,6 +30,26 @@ func newEndOfInputToken() Token {
 	}
 }
 
+func newIntegerToken(lexeme string, base int, line int) Token {
+	n, _ := strconv.ParseInt(lexeme, base, 64)
+	return Token{
+		t:       Integer,
+		lexeme:  lexeme,
+		literal: n,
+		line:    line,
+	}
+}
+
+func newDoubleToken(lexeme string, line int) Token {
+	f, _ := strconv.ParseFloat(lexeme, 64)
+	return Token{
+		t:       Double,
+		lexeme:  lexeme,
+		literal: f,
+		line:    line,
+	}
+}
+
 func newNumberToken(t TokenType, lexeme string, line int) Token {
 	if t == Double {
 		f, _ := strconv.ParseFloat(lexeme, 64)

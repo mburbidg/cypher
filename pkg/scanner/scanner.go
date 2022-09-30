@@ -127,8 +127,8 @@ func (s *Scanner) NextToken() Token {
 	case ch == '"', ch == '\'':
 		return s.scanString(ch)
 	case xid.Start(ch):
-		return s.scanSymbolicName(ch)
-	case space(ch):
+		return s.scanIdentifier(ch)
+	case isSpace(ch):
 		err := s.consumeWhitespace(ch)
 		if err != nil {
 			return s.endOfInputToken()
@@ -159,6 +159,15 @@ func (s *Scanner) matchNext(r rune) (bool, error) {
 	return false, nil
 }
 
+func (s *Scanner) peek() rune {
+	ch, _, err := s.input.ReadRune()
+	if err != nil {
+		return 0
+	}
+	_ = s.input.UnreadRune()
+	return ch
+}
+
 func (s *Scanner) consumeWhitespace(ch rune) error {
 	s.incLine(ch)
 	for {
@@ -166,7 +175,7 @@ func (s *Scanner) consumeWhitespace(ch rune) error {
 		if err != nil {
 			return err
 		}
-		if !space(ch) {
+		if !isSpace(ch) {
 			return s.input.UnreadRune()
 		}
 		s.incLine(ch)
@@ -205,7 +214,7 @@ func (s *Scanner) consumeSingleLineComment() error {
 	}
 }
 
-func (s *Scanner) scanSymbolicName(ch rune) Token {
+func (s *Scanner) scanIdentifier(ch rune) Token {
 	b := strings.Builder{}
 	b.WriteRune(ch)
 	for {
@@ -224,7 +233,7 @@ func (s *Scanner) scanSymbolicName(ch rune) Token {
 		return token
 	}
 	return Token{
-		t:       SymbolName,
+		t:       Identifier,
 		lexeme:  b.String(),
 		literal: nil,
 		line:    s.line,
@@ -233,14 +242,41 @@ func (s *Scanner) scanSymbolicName(ch rune) Token {
 
 func (s *Scanner) scanNumber(ch rune) Token {
 	t := Integer
-	if ch == '.' {
-		t = Double
-	}
 	b := strings.Builder{}
 	b.WriteRune(ch)
+	if ch == '0' {
+		nextCh, _, err := s.input.ReadRune()
+		switch {
+		case err != nil:
+			s.eof = true
+			return newIntegerToken(b.String(), 10, s.line)
+		case nextCh == 'x':
+			b.WriteRune(nextCh)
+			return s.scanHexInteger(b.String())
+		case isOctDigit(nextCh):
+			b.WriteRune(nextCh)
+			return s.scanOctInteger(b.String())
+		case nextCh == '.':
+			b.WriteRune(nextCh)
+			t = Double
+			if !unicode.IsDigit(s.peek()) {
+				return newErrorToken(b.String())
+			}
+		default:
+			_ = s.input.UnreadRune()
+			return newIntegerToken("0", 10, s.line)
+		}
+	}
+	if ch == '.' {
+		t = Double
+		if !unicode.IsDigit(s.peek()) {
+			return newErrorToken(b.String())
+		}
+	}
 	for {
 		ch, _, err := s.input.ReadRune()
 		if err != nil {
+			s.eof = true
 			return newNumberToken(t, b.String(), s.line)
 		}
 		switch {
@@ -249,14 +285,48 @@ func (s *Scanner) scanNumber(ch rune) Token {
 		case ch == '.':
 			b.WriteRune(ch)
 			t = Double
-		case space(ch):
+			if !unicode.IsDigit(s.peek()) {
+				return newErrorToken(b.String())
+			}
+		default:
 			_ = s.input.UnreadRune()
 			return newNumberToken(t, b.String(), s.line)
-		default:
+		}
+	}
+}
+
+func (s *Scanner) scanHexInteger(prefix string) Token {
+	b := strings.Builder{}
+	b.WriteString(prefix)
+	for {
+		ch, _, err := s.input.ReadRune()
+		if err != nil {
+			s.eof = true
+			return newIntegerToken(b.String(), 16, s.line)
+		}
+		if isHexDigit(ch) {
 			b.WriteRune(ch)
-			s.reporter.Error(s.line, fmt.Sprintf("unexpected character '%s'", string(ch)))
-			s.consumeNonWhitespace()
-			return newErrorToken(b.String())
+		} else {
+			_ = s.input.UnreadRune()
+			return newIntegerToken(b.String(), 16, s.line)
+		}
+	}
+}
+
+func (s *Scanner) scanOctInteger(prefix string) Token {
+	b := strings.Builder{}
+	b.WriteString(prefix)
+	for {
+		ch, _, err := s.input.ReadRune()
+		if err != nil {
+			s.eof = true
+			return newIntegerToken(b.String(), 8, s.line)
+		}
+		if isOctDigit(ch) {
+			b.WriteRune(ch)
+		} else {
+			_ = s.input.UnreadRune()
+			return newIntegerToken(b.String(), 8, s.line)
 		}
 	}
 }
@@ -355,8 +425,8 @@ func (s *Scanner) consumeNonWhitespace() {
 		if err != nil {
 			s.eof = true
 		}
-		if !space(ch) {
-			s.input.UnreadRune()
+		if !isSpace(ch) {
+			_ = s.input.UnreadRune()
 			break
 		}
 	}

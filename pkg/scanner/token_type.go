@@ -25,7 +25,7 @@ const (
 	GreaterThanOrEqual
 	DollarSign
 
-	SymbolName
+	Identifier
 	Double
 	Integer
 	String
