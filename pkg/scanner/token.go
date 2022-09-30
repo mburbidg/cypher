@@ -9,6 +9,10 @@ type Token struct {
 	line    int
 }
 
+var endOfInputToken = Token{
+	t: EndOfInput,
+}
+
 func newOperatorToken(t TokenType, line int) Token {
 	return Token{
 		t:    t,
@@ -81,9 +85,17 @@ func newStringToken(lexeme string, literal string, line int) Token {
 	}
 }
 
-func newErrorToken(lexeme string) Token {
+func newIdentifierToken(lexeme string, line int) Token {
+	return Token{
+		t:      Identifier,
+		lexeme: lexeme,
+		line:   line,
+	}
+}
+
+func newIllegalToken(lexeme string) Token {
 	return Token{
 		lexeme: lexeme,
-		t:      Error,
+		t:      Illegal,
 	}
 }

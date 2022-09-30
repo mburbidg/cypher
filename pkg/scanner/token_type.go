@@ -3,7 +3,11 @@ package scanner
 type TokenType int
 
 const (
-	Error TokenType = iota
+	// Special tokens
+	Illegal TokenType = iota
+	EndOfInput
+
+	// Punctuation
 	Period
 	OpenParen
 	CloseParen
@@ -30,9 +34,7 @@ const (
 	Integer
 	String
 
-	/*
-	 * The following types represent reserved words.
-	 */
+	// Reserved words
 
 	// Clauses
 	Create
@@ -88,6 +90,4 @@ const (
 	False
 	Null
 	True
-
-	EndOfInput
 )

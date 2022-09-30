@@ -18,32 +18,71 @@ type Scanner struct {
 	eof      bool
 }
 
+const (
+	eof = -1
+)
+
 func New(input io.Reader, reporter utils.Reporter) *Scanner {
 	return &Scanner{
 		input:    bufio.NewReader(input),
 		reporter: reporter,
 		line:     1,
+		eof:      false,
+	}
+}
+
+func (s *Scanner) next() rune {
+	if s.eof {
+		return eof
+	}
+	ch, _, err := s.input.ReadRune()
+	if err != nil {
+		if err != io.EOF {
+			s.reporter.Error(s.line, fmt.Sprintf("error reading input: err=%s\n", err))
+		}
+		s.eof = true
+		return eof
+	}
+	return ch
+}
+
+func (s *Scanner) peek() rune {
+	ch := s.next()
+	if !s.eof {
+		err := s.input.UnreadRune()
+		if err != nil {
+			s.reporter.Error(s.line, fmt.Sprintf("error un-reading input: err=%s\n", err))
+		}
+	}
+	return ch
+}
+
+func (s *Scanner) prev() {
+	if !s.eof {
+		err := s.input.UnreadRune()
+		if err != nil {
+			s.reporter.Error(s.line, fmt.Sprintf("error un-reading input: err=%s\n", err))
+		}
 	}
 }
 
 func (s *Scanner) NextToken() Token {
 	if s.eof == true {
-		return newEndOfInputToken()
+		return endOfInputToken
 	}
-
-	ch, _, err := s.input.ReadRune()
-	if err != nil {
-		return newEndOfInputToken()
+	ch := s.next()
+	if ch == eof {
+		return endOfInputToken
 	}
 
 	switch {
 	case ch == '.':
-		ch, _, err := s.input.ReadRune()
-		if err != nil {
-			return newEndOfInputToken()
+		ch = s.next()
+		if ch == eof {
+			return endOfInputToken
 		}
 		if unicode.IsDigit(ch) {
-			_ = s.input.UnreadRune()
+			s.prev()
 			return s.scanNumber('.')
 		}
 		return newOperatorToken(Period, s.line)
@@ -66,29 +105,18 @@ func (s *Scanner) NextToken() Token {
 	case ch == '*':
 		return newOperatorToken(Star, s.line)
 	case ch == '/':
-		match, err := s.matchNext('*')
-		if err != nil {
+		ch = s.next()
+		switch ch {
+		case '*':
+			s.consumeMultilineComment()
+			return s.NextToken()
+		case '/':
+			s.consumeSingleLineComment()
+			return s.NextToken()
+		default:
+			s.prev()
 			return newOperatorToken(ForwardSlash, s.line)
 		}
-		if match {
-			err := s.consumeMultilineComment()
-			if err != nil {
-				return s.endOfInputToken()
-			}
-			return s.NextToken()
-		}
-		match, err = s.matchNext('/')
-		if err != nil {
-			return newOperatorToken(ForwardSlash, s.line)
-		}
-		if match {
-			err := s.consumeSingleLineComment()
-			if err != nil {
-				return s.endOfInputToken()
-			}
-			return s.NextToken()
-		}
-		return newOperatorToken(ForwardSlash, s.line)
 	case ch == '%':
 		return newOperatorToken(Percent, s.line)
 	case ch == '^':
@@ -96,29 +124,22 @@ func (s *Scanner) NextToken() Token {
 	case ch == '=':
 		return newOperatorToken(Equal, s.line)
 	case ch == '<':
-		match, err := s.matchNext('>')
-		if err != nil {
-			return s.endOfInputToken()
-		}
-		if match {
+		ch := s.next()
+		switch ch {
+		case '>':
 			return newOperatorToken(NotEqual, s.line)
-		}
-		match, err = s.matchNext('=')
-		if err != nil {
-			return s.endOfInputToken()
-		}
-		if match {
+		case '=':
 			return newOperatorToken(LessThanOrEqual, s.line)
+		default:
+			s.prev()
+			return newOperatorToken(LessThan, s.line)
 		}
-		return newOperatorToken(LessThan, s.line)
 	case ch == '>':
-		match, err := s.matchNext('=')
-		if err != nil {
-			return s.endOfInputToken()
-		}
-		if match {
+		ch := s.next()
+		if ch == '=' {
 			return newOperatorToken(GreaterThanOrEqual, s.line)
 		}
+		s.prev()
 		return newOperatorToken(GreaterThan, s.line)
 	case ch == '$':
 		return newOperatorToken(DollarSign, s.line)
@@ -129,87 +150,52 @@ func (s *Scanner) NextToken() Token {
 	case xid.Start(ch):
 		return s.scanIdentifier(ch)
 	case isSpace(ch):
-		err := s.consumeWhitespace(ch)
-		if err != nil {
-			return s.endOfInputToken()
-		}
+		s.consumeWhitespace(ch)
 		return s.NextToken()
 	}
 
 	return Token{}
 }
 
-func (s *Scanner) endOfInputToken() Token {
-	s.eof = true
-	return newEndOfInputToken()
-}
-
-func (s *Scanner) matchNext(r rune) (bool, error) {
-	ch, _, err := s.input.ReadRune()
-	if err != nil {
-		return false, err
-	}
-	if ch == r {
-		return true, nil
-	}
-	err = s.input.UnreadRune()
-	if err != nil {
-		return false, err
-	}
-	return false, nil
-}
-
-func (s *Scanner) peek() rune {
-	ch, _, err := s.input.ReadRune()
-	if err != nil {
-		return 0
-	}
-	_ = s.input.UnreadRune()
-	return ch
-}
-
-func (s *Scanner) consumeWhitespace(ch rune) error {
+func (s *Scanner) consumeWhitespace(ch rune) {
 	s.incLine(ch)
 	for {
-		ch, _, err := s.input.ReadRune()
-		if err != nil {
-			return err
-		}
+		ch := s.next()
 		if !isSpace(ch) {
-			return s.input.UnreadRune()
+			s.prev()
+			break
 		}
 		s.incLine(ch)
 	}
 }
 
-func (s *Scanner) consumeMultilineComment() error {
+func (s *Scanner) consumeMultilineComment() {
 	for {
-		ch, _, err := s.input.ReadRune()
-		if err != nil {
-			return err
+		ch := s.next()
+		if ch == eof {
+			s.reporter.Error(s.line, "unterminated comment")
+			return
 		}
 		if ch == '*' {
-			ok, err := s.matchNext('/')
-			if err != nil {
-				return err
+			ch := s.next()
+			if ch == '/' {
+				return
 			}
-			if ok {
-				return nil
-			}
+			s.incLine(ch)
 		}
 		s.incLine(ch)
 	}
 }
 
-func (s *Scanner) consumeSingleLineComment() error {
+func (s *Scanner) consumeSingleLineComment() {
 	for {
-		ch, _, err := s.input.ReadRune()
-		if err != nil {
-			return err
+		ch := s.next()
+		if ch == eof {
+			return
 		}
 		if ch == '\n' {
 			s.incLine(ch)
-			return nil
+			return
 		}
 	}
 }
@@ -218,26 +204,18 @@ func (s *Scanner) scanIdentifier(ch rune) Token {
 	b := strings.Builder{}
 	b.WriteRune(ch)
 	for {
-		ch, _, err := s.input.ReadRune()
-		if err != nil {
-			break
-		}
+		ch := s.next()
 		if xid.Continue(ch) {
 			b.WriteRune(ch)
 		} else {
-			_ = s.input.UnreadRune()
+			s.prev()
 			break
 		}
 	}
 	if token, ok := reservedWords.token(b.String(), s.line); ok {
 		return token
 	}
-	return Token{
-		t:       Identifier,
-		lexeme:  b.String(),
-		literal: nil,
-		line:    s.line,
-	}
+	return newIdentifierToken(b.String(), s.line)
 }
 
 func (s *Scanner) scanNumber(ch rune) Token {
@@ -245,17 +223,17 @@ func (s *Scanner) scanNumber(ch rune) Token {
 	b := strings.Builder{}
 	b.WriteRune(ch)
 	if ch == '0' {
-		nextCh, _, err := s.input.ReadRune()
+		nextCh := s.next()
 		switch {
-		case err != nil:
-			s.eof = true
-			return newIntegerToken(b.String(), 10, s.line)
 		case nextCh == 'x':
 			b.WriteRune(nextCh)
 			return s.scanHexInteger(b.String())
 		case isOctDigit(nextCh):
 			b.WriteRune(nextCh)
 			return s.scanOctInteger(b.String())
+		case err != nil:
+			s.eof = true
+			return newIntegerToken(b.String(), 10, s.line)
 		case nextCh == '.':
 			b.WriteRune(nextCh)
 			t = Double
@@ -295,19 +273,22 @@ func (s *Scanner) scanNumber(ch rune) Token {
 	}
 }
 
+func (s *Scanner) scanDouble(prefix string) Token {
+}
+
 func (s *Scanner) scanHexInteger(prefix string) Token {
 	b := strings.Builder{}
 	b.WriteString(prefix)
 	for {
-		ch, _, err := s.input.ReadRune()
-		if err != nil {
-			s.eof = true
-			return newIntegerToken(b.String(), 16, s.line)
-		}
-		if isHexDigit(ch) {
+		ch := s.next()
+		switch {
+		case isHexDigit(ch):
 			b.WriteRune(ch)
-		} else {
-			_ = s.input.UnreadRune()
+		default:
+			if len(b.String() < 3) {
+			}
+		}
+
 			return newIntegerToken(b.String(), 16, s.line)
 		}
 	}
@@ -337,11 +318,10 @@ func (s *Scanner) scanString(ch rune) Token {
 	lexeme.WriteRune(startCh)
 	literal := strings.Builder{}
 	for {
-		ch, _, err := s.input.ReadRune()
-		if err != nil {
+		ch := s.next()
+		if ch == eof {
 			s.reporter.Error(s.line, fmt.Sprintf("expecting string end character '%s'", string(startCh)))
-			s.eof = true
-			return newErrorToken(lexeme.String())
+			return newIllegalToken(lexeme.String())
 		}
 		switch {
 		case ch == startCh:
@@ -358,10 +338,9 @@ func (s *Scanner) scanString(ch rune) Token {
 }
 
 func (s *Scanner) scanEscapeCharacter() rune {
-	ch, _, err := s.input.ReadRune()
-	if err != nil {
+	ch := s.next()
+	if ch == eof {
 		s.reporter.Error(s.line, fmt.Sprintf("incomplete character escape"))
-		s.eof = true
 		return 0
 	}
 	switch ch {
@@ -381,10 +360,9 @@ func (s *Scanner) scanEscapeCharacter() rune {
 		b := strings.Builder{}
 		b.WriteString("\\u")
 		for i := 0; i < 4; i++ {
-			ch, _, err := s.input.ReadRune()
-			if err != nil {
+			ch := s.next()
+			if ch == eof {
 				s.reporter.Error(s.line, fmt.Sprintf("incomplete character escape"))
-				s.eof = true
 				return 0
 			}
 			ok := unicode.In(ch, unicode.ASCII_Hex_Digit)
@@ -400,10 +378,9 @@ func (s *Scanner) scanEscapeCharacter() rune {
 		b := strings.Builder{}
 		b.WriteString("\\U")
 		for i := 0; i < 8; i++ {
-			ch, _, err := s.input.ReadRune()
-			if err != nil {
+			ch := s.next()
+			if ch == eof {
 				s.reporter.Error(s.line, fmt.Sprintf("incomplete character escape"))
-				s.eof = true
 				return 0
 			}
 			ok := unicode.In(ch, unicode.ASCII_Hex_Digit)
