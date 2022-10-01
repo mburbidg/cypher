@@ -1,7 +1,5 @@
 package scanner
 
-import "github.com/smasher164/xid"
-
 var spaceMap = map[rune]bool{
 	' ':      true,
 	'\t':     true,
@@ -64,11 +62,9 @@ func isOctDigit(ch rune) bool {
 	return ok
 }
 
-func isInvalidTerminator(ch rune) bool {
-	switch {
-	case xid.Start(ch):
-		return true
-	case ch == '"', ch == '\'':
+func canTermNumber(ch rune) bool {
+	switch ch {
+	case '.', '(', ')', '{', '}', '[', ']', '+', '-', '*', '/', '%', '^', '=', '<', '>', '$':
 		return true
 	default:
 		return false

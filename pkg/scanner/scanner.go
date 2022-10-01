@@ -219,95 +219,133 @@ func (s *Scanner) scanIdentifier(ch rune) Token {
 }
 
 func (s *Scanner) scanNumber(ch rune) Token {
-	t := Integer
 	b := strings.Builder{}
 	b.WriteRune(ch)
-	if ch == '0' {
-		nextCh := s.next()
-		switch {
-		case nextCh == 'x':
-			b.WriteRune(nextCh)
-			return s.scanHexInteger(b.String())
-		case isOctDigit(nextCh):
-			b.WriteRune(nextCh)
-			return s.scanOctInteger(b.String())
-		case err != nil:
-			s.eof = true
-			return newIntegerToken(b.String(), 10, s.line)
-		case nextCh == '.':
-			b.WriteRune(nextCh)
-			t = Double
-			if !unicode.IsDigit(s.peek()) {
-				return newErrorToken(b.String())
-			}
+	switch ch {
+	case '0':
+		switch ch := s.next(); ch {
+		case 'x':
+			b.WriteRune(ch)
+			return s.scanHexInteger(&b)
+		case '1', '2', '3', '4', '5', '6', '7':
+			b.WriteRune(ch)
+			return s.scanOctInteger(&b)
+		case 'E':
+			b.WriteRune(ch)
+			return s.scanExponent(&b)
+		case '.':
+			b.WriteRune(ch)
+			return s.scanDouble(&b)
 		default:
-			_ = s.input.UnreadRune()
+			s.prev()
 			return newIntegerToken("0", 10, s.line)
 		}
+	case '.':
+		return s.scanDouble(&b)
 	}
-	if ch == '.' {
-		t = Double
-		if !unicode.IsDigit(s.peek()) {
-			return newErrorToken(b.String())
-		}
-	}
-	for {
-		ch, _, err := s.input.ReadRune()
-		if err != nil {
-			s.eof = true
-			return newNumberToken(t, b.String(), s.line)
-		}
-		switch {
-		case unicode.IsDigit(ch):
-			b.WriteRune(ch)
-		case ch == '.':
-			b.WriteRune(ch)
-			t = Double
-			if !unicode.IsDigit(s.peek()) {
-				return newErrorToken(b.String())
-			}
-		default:
-			_ = s.input.UnreadRune()
-			return newNumberToken(t, b.String(), s.line)
-		}
-	}
-}
-
-func (s *Scanner) scanDouble(prefix string) Token {
-}
-
-func (s *Scanner) scanHexInteger(prefix string) Token {
-	b := strings.Builder{}
-	b.WriteString(prefix)
 	for {
 		ch := s.next()
-		switch {
-		case isHexDigit(ch):
+		if ch == eof {
+			s.prev()
+			return newIntegerToken(b.String(), 10, s.line)
+		}
+		switch ch {
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+			b.WriteRune(ch)
+		case '.':
+			b.WriteRune(ch)
+			return s.scanDouble(&b)
+		case 'E':
+			b.WriteRune(ch)
+			return s.scanExponent(&b)
+		default:
+			s.prev()
+			return newIntegerToken(b.String(), 10, s.line)
+		}
+	}
+}
+
+func (s *Scanner) scanDouble(b *strings.Builder) Token {
+	switch ch := s.next(); ch {
+	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+		b.WriteRune(ch)
+	default:
+		s.prev()
+		s.reporter.Error(s.line, "expecting fractional part of double")
+		return newIllegalToken(b.String())
+	}
+	for {
+		switch ch := s.next(); ch {
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+			b.WriteRune(ch)
+		case 'E':
+			b.WriteRune(ch)
+			return s.scanExponent(b)
+		default:
+			s.prev()
+			return newDoubleToken(b.String(), s.line)
+		}
+	}
+}
+
+func (s *Scanner) scanHexInteger(b *strings.Builder) Token {
+	for {
+		switch ch := s.next(); ch {
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+			b.WriteRune(ch)
+		case 'a', 'b', 'c', 'd', 'e', 'f', 'A', 'B', 'C', 'D', 'E', 'F':
 			b.WriteRune(ch)
 		default:
-			if len(b.String() < 3) {
+			s.prev()
+			if len(b.String()) < 3 {
+				s.reporter.Error(s.line, "expecting hex digit following 'x'")
+				return newIllegalToken(b.String())
 			}
-		}
-
 			return newIntegerToken(b.String(), 16, s.line)
 		}
 	}
 }
 
-func (s *Scanner) scanOctInteger(prefix string) Token {
-	b := strings.Builder{}
-	b.WriteString(prefix)
+func (s *Scanner) scanOctInteger(b *strings.Builder) Token {
 	for {
-		ch, _, err := s.input.ReadRune()
-		if err != nil {
-			s.eof = true
+		switch ch := s.next(); ch {
+		case '0', '1', '2', '3', '4', '5', '6', '7':
+			b.WriteRune(ch)
+		default:
+			s.prev()
 			return newIntegerToken(b.String(), 8, s.line)
 		}
-		if isOctDigit(ch) {
+	}
+}
+
+func (s *Scanner) scanExponent(b *strings.Builder) Token {
+	for i := 0; ; i++ {
+		switch ch := s.next(); ch {
+		case '-':
+			if i > 0 {
+				s.prev()
+				s.reporter.Error(s.line, "invalid exponent")
+				return newIllegalToken(b.String())
+			}
 			b.WriteRune(ch)
-		} else {
-			_ = s.input.UnreadRune()
-			return newIntegerToken(b.String(), 8, s.line)
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+			b.WriteRune(ch)
+		default:
+			switch i {
+			case 0:
+				s.prev()
+				s.reporter.Error(s.line, "expecting exponent")
+				return newIllegalToken(b.String())
+			case 1:
+				if ch == '`' {
+					s.prev()
+					s.reporter.Error(s.line, "expecting digit following '-' in exponent")
+					return newIllegalToken(b.String())
+				}
+				return newDoubleToken(b.String(), s.line)
+			default:
+				return newDoubleToken(b.String(), s.line)
+			}
 		}
 	}
 }

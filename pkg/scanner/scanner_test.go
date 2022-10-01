@@ -46,7 +46,7 @@ func TestNumbers(t *testing.T) {
 		"double:0.x":  {"0.1", []TokenType{Double, EndOfInput}},
 		"double:x.x":  {"25.1", []TokenType{Double, EndOfInput}},
 		"double:.x":   {".15", []TokenType{Double, EndOfInput}},
-		"double:x.":   {"14.", []TokenType{Error, EndOfInput}},
+		"double:x.":   {"14.", []TokenType{Illegal, EndOfInput}},
 	}
 
 	for name, tc := range tests {
@@ -60,7 +60,7 @@ func TestNumbers(t *testing.T) {
 func TestBogusNumber(t *testing.T) {
 	reporter := newTestReporter()
 	s := New(bytes.NewBufferString("1a 1.2"), reporter)
-	assertTokens(t, []TokenType{Error, Double, EndOfInput}, s)
+	assertTokens(t, []TokenType{Illegal, Double, EndOfInput}, s)
 	assert.Equal(t, 1, len(reporter.errors))
 }
 
