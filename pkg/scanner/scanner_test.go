@@ -1,9 +1,7 @@
 package scanner
 
 import (
-	"bufio"
 	"bytes"
-	"fmt"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -85,11 +83,27 @@ func TestNumbers(t *testing.T) {
 	}
 }
 
-func TestBogusNumber(t *testing.T) {
-	reporter := newTestReporter()
-	s := New(bytes.NewBufferString("1a 1.2"), reporter)
-	assertTokens(t, []TokenType{Illegal, Double, EndOfInput}, s)
-	assert.Equal(t, 1, len(reporter.errors))
+func TestNumberValues(t *testing.T) {
+	tests := map[string]struct {
+		src      string
+		literals []interface{}
+	}{
+		"zero":        {"0", []interface{}{int64(0)}},
+		"integer:145": {"145", []interface{}{int64(145)}},
+		"integer:0xa": {"0xa", []interface{}{int64(10)}},
+		"integer:077": {"077", []interface{}{int64(63)}},
+		"double:.10":  {".10", []interface{}{float64(.10)}},
+		"double:1.10": {"1.10", []interface{}{float64(1.10)}},
+		"double:1E3":  {"1E3", []interface{}{float64(1000.0)}},
+		"double:1E-3": {"1E-3", []interface{}{float64(1.0 / 1000.0)}},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			s := New(bytes.NewBufferString(tc.src), newTestReporter())
+			assertLiteral(t, tc.literals, s)
+		})
+	}
 }
 
 func TestString(t *testing.T) {
@@ -102,47 +116,34 @@ func TestString(t *testing.T) {
 	assert.Equal(t, 0, len(reporter.errors))
 }
 
-func TestIt(t *testing.T) {
-	buf := bytes.NewBufferString("Create")
-	r := bufio.NewReader(buf)
-	ch, _, err := r.ReadRune()
-	if err != nil {
-		fmt.Println(err)
+func TestPunctuation(t *testing.T) {
+	tests := map[string]struct {
+		src    string
+		tokens []TokenType
+	}{
+		"punctuation:1":        {".(){}[]", []TokenType{Period, OpenParen, CloseParen, OpenBrace, CloseBrace, OpenBracket, CloseBracket, EndOfInput}},
+		"punctuation:1/ws":     {". ( ) { } [ ]", []TokenType{Period, OpenParen, CloseParen, OpenBrace, CloseBrace, OpenBracket, CloseBracket, EndOfInput}},
+		"punctuation:2":        {"+-*/%^$", []TokenType{Plus, Minus, Star, ForwardSlash, Percent, Caret, DollarSign, EndOfInput}},
+		"punctuation:2/ws":     {"+ - * / % ^ $", []TokenType{Plus, Minus, Star, ForwardSlash, Percent, Caret, DollarSign, EndOfInput}},
+		"equal":                {"a=b", []TokenType{Identifier, Equal, Identifier, EndOfInput}},
+		"equal/ws":             {"a = b", []TokenType{Identifier, Equal, Identifier, EndOfInput}},
+		"!equal":               {"a<>b", []TokenType{Identifier, NotEqual, Identifier, EndOfInput}},
+		"!equal/ws":            {"a <> b", []TokenType{Identifier, NotEqual, Identifier, EndOfInput}},
+		"lessthan":             {"a<b", []TokenType{Identifier, LessThan, Identifier, EndOfInput}},
+		"lessthan/ws":          {"a < b", []TokenType{Identifier, LessThan, Identifier, EndOfInput}},
+		"lessthanorequal":      {"a<=b", []TokenType{Identifier, LessThanOrEqual, Identifier, EndOfInput}},
+		"lessthanorequal/ws":   {"a <= b", []TokenType{Identifier, LessThanOrEqual, Identifier, EndOfInput}},
+		"greaterthan":          {"a>b", []TokenType{Identifier, GreaterThan, Identifier, EndOfInput}},
+		"greaterthan/ws":       {"a > b", []TokenType{Identifier, GreaterThan, Identifier, EndOfInput}},
+		"greaterthanorequal":   {"a>=b", []TokenType{Identifier, GreaterThanOrEqual, Identifier, EndOfInput}},
+		"greaterhanorequal/ws": {"a >= b", []TokenType{Identifier, GreaterThanOrEqual, Identifier, EndOfInput}},
 	}
-	fmt.Println(ch)
-	ch, _, err = r.ReadRune()
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println(ch)
-	ch, _, err = r.ReadRune()
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println(ch)
-	ch, _, err = r.ReadRune()
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println(ch)
-	ch, _, err = r.ReadRune()
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println(ch)
-	ch, _, err = r.ReadRune()
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println(ch)
-	ch, _, err = r.ReadRune()
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println(ch)
-	err = r.UnreadRune()
-	if err != nil {
-		fmt.Println(err)
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			s := New(bytes.NewBufferString(tc.src), newTestReporter())
+			assertTokens(t, tc.tokens, s)
+		})
 	}
 }
 
@@ -150,5 +151,12 @@ func assertTokens(t *testing.T, expected []TokenType, scanner *Scanner) {
 	for _, tokenType := range expected {
 		token := scanner.NextToken()
 		assert.Equal(t, tokenType, token.t)
+	}
+}
+
+func assertLiteral(t *testing.T, expected []interface{}, scanner *Scanner) {
+	for _, literal := range expected {
+		token := scanner.NextToken()
+		assert.Equal(t, literal, token.literal)
 	}
 }

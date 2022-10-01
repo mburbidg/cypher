@@ -1,6 +1,9 @@
 package scanner
 
-import "strconv"
+import (
+	"log"
+	"strconv"
+)
 
 type Token struct {
 	t       TokenType
@@ -35,7 +38,8 @@ func newEndOfInputToken() Token {
 }
 
 func newIntegerToken(lexeme string, base int, line int) Token {
-	n, _ := strconv.ParseInt(lexeme, base, 64)
+	n, err := strconv.ParseInt(lexeme, base, 64)
+	log.Printf("err=%s\n", err)
 	return Token{
 		t:       Integer,
 		lexeme:  lexeme,

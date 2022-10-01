@@ -18,5 +18,5 @@ func TestNewKeywordToken(t *testing.T) {
 	assert.Equal(t, Create, token.t)
 	assert.Equal(t, "create", token.lexeme)
 	assert.Empty(t, token.literal)
-	assert.Empty(t, 20, token.line)
+	assert.Equal(t, 20, token.line)
 }

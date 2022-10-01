@@ -81,8 +81,8 @@ func (s *Scanner) NextToken() Token {
 		if ch == eof {
 			return endOfInputToken
 		}
+		s.prev()
 		if unicode.IsDigit(ch) {
-			s.prev()
 			return s.scanNumber('.')
 		}
 		return newOperatorToken(Period, s.line)
@@ -301,7 +301,7 @@ func (s *Scanner) scanHexInteger(b *strings.Builder) Token {
 				s.reporter.Error(s.line, "expecting hex digit following 'x'")
 				return newIllegalToken(b.String())
 			}
-			return newIntegerToken(b.String(), 16, s.line)
+			return newIntegerToken(b.String(), 0, s.line)
 		}
 	}
 }
@@ -313,7 +313,7 @@ func (s *Scanner) scanOctInteger(b *strings.Builder) Token {
 			b.WriteRune(ch)
 		default:
 			s.prev()
-			return newIntegerToken(b.String(), 8, s.line)
+			return newIntegerToken(b.String(), 0, s.line)
 		}
 	}
 }
