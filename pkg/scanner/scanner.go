@@ -327,18 +327,21 @@ func (s *Scanner) scanExponent(b *strings.Builder) Token {
 				s.reporter.Error(s.line, "invalid exponent")
 				return newIllegalToken(b.String())
 			}
+			if !isDigit(s.peek()) {
+				s.reporter.Error(s.line, "invalid exponent")
+				return newIllegalToken(b.String())
+			}
 			b.WriteRune(ch)
 		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 			b.WriteRune(ch)
 		default:
+			s.prev()
 			switch i {
 			case 0:
-				s.prev()
 				s.reporter.Error(s.line, "expecting exponent")
 				return newIllegalToken(b.String())
 			case 1:
-				if ch == '`' {
-					s.prev()
+				if ch == '-' {
 					s.reporter.Error(s.line, "expecting digit following '-' in exponent")
 					return newIllegalToken(b.String())
 				}

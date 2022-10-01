@@ -32,37 +32,21 @@ var spaceMap = map[rune]bool{
 	'\u202F': true,
 }
 
-var octMap = map[rune]bool{
-	'0': true,
-	'1': true,
-	'2': true,
-	'3': true,
-	'4': true,
-	'5': true,
-	'6': true,
-	'7': true,
-}
-
 func isSpace(ch rune) bool {
 	_, ok := spaceMap[ch]
 	return ok
 }
 
-func isHexDigit(ch rune) bool {
+func isDigit(ch rune) bool {
 	switch {
-	case ch >= '0' && ch <= '9', ch >= 'a' && ch <= 'f', ch >= 'A' && ch <= 'F':
+	case ch >= '0' && ch <= '9':
 		return true
 	default:
 		return false
 	}
 }
 
-func isOctDigit(ch rune) bool {
-	_, ok := octMap[ch]
-	return ok
-}
-
-func canTermNumber(ch rune) bool {
+func numberTerm(ch rune) bool {
 	switch ch {
 	case '.', '(', ')', '{', '}', '[', ']', '+', '-', '*', '/', '%', '^', '=', '<', '>', '$':
 		return true
