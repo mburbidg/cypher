@@ -212,7 +212,7 @@ func TestStatement(t *testing.T) {
 		src    string
 		tokens []TokenType
 	}{
-		"statement:1": {"MATCH (e:Entity) RETURN e", []TokenType{Match, OpenParen, Identifier, Colon, Identifier, CloseParen, Return, Identifier, EndOfInput}},
+		"statement:1": {"MATCH (e:Entity) /* with a comment */ RETURN e", []TokenType{Match, OpenParen, Identifier, Colon, Identifier, CloseParen, Return, Identifier, EndOfInput}},
 	}
 
 	for name, tc := range tests {
