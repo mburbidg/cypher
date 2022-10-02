@@ -28,6 +28,7 @@ const (
 	LessThanOrEqual
 	GreaterThanOrEqual
 	DollarSign
+	Colon
 
 	Identifier
 	Double

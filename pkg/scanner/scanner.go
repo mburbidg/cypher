@@ -143,6 +143,8 @@ func (s *Scanner) NextToken() Token {
 		return newOperatorToken(GreaterThan, s.line)
 	case ch == '$':
 		return newOperatorToken(DollarSign, s.line)
+	case ch == ':':
+		return newOperatorToken(Colon, s.line)
 	case unicode.IsDigit(ch):
 		return s.scanNumber(ch)
 	case ch == '"', ch == '\'':

@@ -123,8 +123,8 @@ func TestPunctuation(t *testing.T) {
 	}{
 		"punctuation:1":        {".(){}[]", []TokenType{Period, OpenParen, CloseParen, OpenBrace, CloseBrace, OpenBracket, CloseBracket, EndOfInput}},
 		"punctuation:1/ws":     {". ( ) { } [ ]", []TokenType{Period, OpenParen, CloseParen, OpenBrace, CloseBrace, OpenBracket, CloseBracket, EndOfInput}},
-		"punctuation:2":        {"+-*/%^$", []TokenType{Plus, Minus, Star, ForwardSlash, Percent, Caret, DollarSign, EndOfInput}},
-		"punctuation:2/ws":     {"+ - * / % ^ $", []TokenType{Plus, Minus, Star, ForwardSlash, Percent, Caret, DollarSign, EndOfInput}},
+		"punctuation:2":        {"+-*/%^$:", []TokenType{Plus, Minus, Star, ForwardSlash, Percent, Caret, DollarSign, Colon, EndOfInput}},
+		"punctuation:2/ws":     {"+ - * / % ^ $ :", []TokenType{Plus, Minus, Star, ForwardSlash, Percent, Caret, DollarSign, Colon, EndOfInput}},
 		"equal":                {"a=b", []TokenType{Identifier, Equal, Identifier, EndOfInput}},
 		"equal/ws":             {"a = b", []TokenType{Identifier, Equal, Identifier, EndOfInput}},
 		"!equal":               {"a<>b", []TokenType{Identifier, NotEqual, Identifier, EndOfInput}},
@@ -137,6 +137,82 @@ func TestPunctuation(t *testing.T) {
 		"greaterthan/ws":       {"a > b", []TokenType{Identifier, GreaterThan, Identifier, EndOfInput}},
 		"greaterthanorequal":   {"a>=b", []TokenType{Identifier, GreaterThanOrEqual, Identifier, EndOfInput}},
 		"greaterhanorequal/ws": {"a >= b", []TokenType{Identifier, GreaterThanOrEqual, Identifier, EndOfInput}},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			s := New(bytes.NewBufferString(tc.src), newTestReporter())
+			assertTokens(t, tc.tokens, s)
+		})
+	}
+}
+
+func TestKeywords(t *testing.T) {
+	tests := map[string]struct {
+		src    string
+		tokens []TokenType
+	}{
+		"CREATE:create": {"create", []TokenType{Create, EndOfInput}},
+		"CREATE:Create": {"Create", []TokenType{Create, EndOfInput}},
+		"CREATE:CREATE": {"CREATE", []TokenType{Create, EndOfInput}},
+		"DELETE":        {"delete", []TokenType{Delete, EndOfInput}},
+		"DETACH":        {"detach", []TokenType{Detach, EndOfInput}},
+		"EXISTS":        {"exists", []TokenType{Exists, EndOfInput}},
+		"MATCH":         {"match", []TokenType{Match, EndOfInput}},
+		"MERGE":         {"merge", []TokenType{Merge, EndOfInput}},
+		"OPTIONAL":      {"optional", []TokenType{Optional, EndOfInput}},
+		"REMOVE":        {"remove", []TokenType{Remove, EndOfInput}},
+		"RETURN":        {"return", []TokenType{Return, EndOfInput}},
+		"SET":           {"set", []TokenType{Set, EndOfInput}},
+		"UNION":         {"union", []TokenType{Union, EndOfInput}},
+		"UNWIND":        {"unwind", []TokenType{Unwind, EndOfInput}},
+		"WITH":          {"with", []TokenType{With, EndOfInput}},
+		"LIMIT":         {"limit", []TokenType{Limit, EndOfInput}},
+		"ORDER":         {"order", []TokenType{Order, EndOfInput}},
+		"SKIP":          {"Skip", []TokenType{Skip, EndOfInput}},
+		"WHERE":         {"where", []TokenType{Where, EndOfInput}},
+		"ASC":           {"asc", []TokenType{Asc, EndOfInput}},
+		"ASCENDING":     {"ascending", []TokenType{Ascending, EndOfInput}},
+		"BY":            {"by", []TokenType{By, EndOfInput}},
+		"DESC":          {"desc", []TokenType{Desc, EndOfInput}},
+		"DESCENDING":    {"descending", []TokenType{Descending, EndOfInput}},
+		"ON":            {"on", []TokenType{On, EndOfInput}},
+		"ALL":           {"all", []TokenType{All, EndOfInput}},
+		"CASE":          {"case", []TokenType{Case, EndOfInput}},
+		"ELSE":          {"else", []TokenType{Else, EndOfInput}},
+		"END":           {"end", []TokenType{End, EndOfInput}},
+		"THEN":          {"then", []TokenType{Then, EndOfInput}},
+		"WHEN":          {"when", []TokenType{When, EndOfInput}},
+		"AND":           {"and", []TokenType{And, EndOfInput}},
+		"AS":            {"as", []TokenType{As, EndOfInput}},
+		"CONTAINS":      {"contains", []TokenType{Contains, EndOfInput}},
+		"DISTINCT":      {"distinct", []TokenType{Distinct, EndOfInput}},
+		"ENDS":          {"ends", []TokenType{Ends, EndOfInput}},
+		"IN":            {"in", []TokenType{In, EndOfInput}},
+		"IS":            {"is", []TokenType{Is, EndOfInput}},
+		"NOT":           {"not", []TokenType{Not, EndOfInput}},
+		"OR":            {"or", []TokenType{Or, EndOfInput}},
+		"STARTS":        {"starts", []TokenType{Starts, EndOfInput}},
+		"XOR":           {"xor", []TokenType{Xor, EndOfInput}},
+		"FALSE":         {"false", []TokenType{False, EndOfInput}},
+		"NULL":          {"null", []TokenType{Null, EndOfInput}},
+		"TRUE":          {"true", []TokenType{True, EndOfInput}},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			s := New(bytes.NewBufferString(tc.src), newTestReporter())
+			assertTokens(t, tc.tokens, s)
+		})
+	}
+}
+
+func TestStatement(t *testing.T) {
+	tests := map[string]struct {
+		src    string
+		tokens []TokenType
+	}{
+		"statement:1": {"MATCH (e:Entity) RETURN e", []TokenType{Match, OpenParen, Identifier, Colon, Identifier, CloseParen, Return, Identifier, EndOfInput}},
 	}
 
 	for name, tc := range tests {
