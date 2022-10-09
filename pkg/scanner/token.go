@@ -6,100 +6,78 @@ import (
 )
 
 type Token struct {
-	t       TokenType
-	lexeme  string
-	literal any
-	line    int
+	T       TokenType
+	Lexeme  string
+	Literal any
+	Line    int
 }
 
 var endOfInputToken = Token{
-	t: EndOfInput,
+	T: EndOfInput,
 }
 
 func newOperatorToken(t TokenType, line int) Token {
 	return Token{
-		t:    t,
-		line: line,
+		T:    t,
+		Line: line,
 	}
 }
 
 func newKeywordToken(t TokenType, lexeme string, line int) Token {
 	return Token{
-		t:      t,
-		lexeme: lexeme,
-		line:   line,
+		T:      t,
+		Lexeme: lexeme,
+		Line:   line,
 	}
 }
 
 func newEndOfInputToken() Token {
 	return Token{
-		t: EndOfInput,
+		T: EndOfInput,
 	}
 }
 
-func newIntegerToken(lexeme string, base int, line int) Token {
+func newIntegerToken(t TokenType, lexeme string, base int, line int) Token {
 	n, err := strconv.ParseInt(lexeme, base, 64)
 	log.Printf("err=%s\n", err)
 	return Token{
-		t:       Integer,
-		lexeme:  lexeme,
-		literal: n,
-		line:    line,
+		T:       t,
+		Lexeme:  lexeme,
+		Literal: n,
+		Line:    line,
 	}
 }
 
 func newDoubleToken(lexeme string, line int) Token {
 	f, _ := strconv.ParseFloat(lexeme, 64)
 	return Token{
-		t:       Double,
-		lexeme:  lexeme,
-		literal: f,
-		line:    line,
+		T:       Double,
+		Lexeme:  lexeme,
+		Literal: f,
+		Line:    line,
 	}
-}
-
-func newNumberToken(t TokenType, lexeme string, line int) Token {
-	if t == Double {
-		f, _ := strconv.ParseFloat(lexeme, 64)
-		return Token{
-			t:       t,
-			lexeme:  lexeme,
-			literal: f,
-			line:    line,
-		}
-	}
-	if t == Integer {
-		n, _ := strconv.ParseInt(lexeme, 10, 32)
-		return Token{
-			t:       t,
-			lexeme:  lexeme,
-			literal: n,
-			line:    line,
-		}
-	}
-	return Token{}
 }
 
 func newStringToken(lexeme string, literal string, line int) Token {
 	return Token{
-		t:       String,
-		lexeme:  lexeme,
-		literal: literal,
-		line:    line,
+		T:       String,
+		Lexeme:  lexeme,
+		Literal: literal,
+		Line:    line,
 	}
 }
 
 func newIdentifierToken(lexeme string, line int) Token {
 	return Token{
-		t:      Identifier,
-		lexeme: lexeme,
-		line:   line,
+		T:      Identifier,
+		Lexeme: lexeme,
+		Line:   line,
 	}
 }
 
 func newIllegalToken(lexeme string) Token {
 	return Token{
-		lexeme: lexeme,
-		t:      Illegal,
+		Lexeme: lexeme,
+		T:      Illegal,
 	}
 }

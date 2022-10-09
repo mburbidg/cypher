@@ -36,16 +36,16 @@ func TestNumbers(t *testing.T) {
 		src    string
 		tokens []TokenType
 	}{
-		"zero":              {"0", []TokenType{Integer, EndOfInput}},
-		"zero:na":           {"0a", []TokenType{Integer, Identifier, EndOfInput}},
-		"zero:-n+":          {"-0+", []TokenType{Minus, Integer, Plus, EndOfInput}},
-		"zero:a n b":        {"a 0 b", []TokenType{Identifier, Integer, Identifier, EndOfInput}},
-		"integer":           {"240", []TokenType{Integer, EndOfInput}},
-		"integer:-n+":       {"-240+", []TokenType{Minus, Integer, Plus, EndOfInput}},
-		"integer:a n b":     {"a 240 b", []TokenType{Identifier, Integer, Identifier, EndOfInput}},
-		"integer:xa":        {"10a", []TokenType{Integer, Identifier, EndOfInput}},
-		"integer:0xa":       {"0x3ae1", []TokenType{Integer, EndOfInput}},
-		"integer:0nn":       {"0371", []TokenType{Integer, EndOfInput}},
+		"zero":              {"0", []TokenType{DecimalInteger, EndOfInput}},
+		"zero:na":           {"0a", []TokenType{DecimalInteger, Identifier, EndOfInput}},
+		"zero:-n+":          {"-0+", []TokenType{Minus, DecimalInteger, Plus, EndOfInput}},
+		"zero:a n b":        {"a 0 b", []TokenType{Identifier, DecimalInteger, Identifier, EndOfInput}},
+		"integer":           {"240", []TokenType{DecimalInteger, EndOfInput}},
+		"integer:-n+":       {"-240+", []TokenType{Minus, DecimalInteger, Plus, EndOfInput}},
+		"integer:a n b":     {"a 240 b", []TokenType{Identifier, DecimalInteger, Identifier, EndOfInput}},
+		"integer:xa":        {"10a", []TokenType{DecimalInteger, Identifier, EndOfInput}},
+		"integer:0xa":       {"0x3ae1", []TokenType{HexInteger, EndOfInput}},
+		"integer:0nn":       {"0371", []TokenType{OctInteger, EndOfInput}},
 		"double:0.x":        {"0.1", []TokenType{Double, EndOfInput}},
 		"double:-0.x+":      {"-0.1+", []TokenType{Minus, Double, Plus, EndOfInput}},
 		"double:a 0.x b":    {"a 0.1 b", []TokenType{Identifier, Double, Identifier, EndOfInput}},
@@ -121,8 +121,8 @@ func TestPunctuation(t *testing.T) {
 		src    string
 		tokens []TokenType
 	}{
-		"punctuation:1":        {".(){}[]", []TokenType{Period, OpenParen, CloseParen, OpenBrace, CloseBrace, OpenBracket, CloseBracket, EndOfInput}},
-		"punctuation:1/ws":     {". ( ) { } [ ]", []TokenType{Period, OpenParen, CloseParen, OpenBrace, CloseBrace, OpenBracket, CloseBracket, EndOfInput}},
+		"punctuation:1":        {".(){}[]..", []TokenType{Period, OpenParen, CloseParen, OpenBrace, CloseBrace, OpenBracket, CloseBracket, Dotdot, EndOfInput}},
+		"punctuation:1/ws":     {". ( ) { } [ ] ..", []TokenType{Period, OpenParen, CloseParen, OpenBrace, CloseBrace, OpenBracket, CloseBracket, Dotdot, EndOfInput}},
 		"punctuation:2":        {"+-*/%^$:", []TokenType{Plus, Minus, Star, ForwardSlash, Percent, Caret, DollarSign, Colon, EndOfInput}},
 		"punctuation:2/ws":     {"+ - * / % ^ $ :", []TokenType{Plus, Minus, Star, ForwardSlash, Percent, Caret, DollarSign, Colon, EndOfInput}},
 		"equal":                {"a=b", []TokenType{Identifier, Equal, Identifier, EndOfInput}},
@@ -226,13 +226,13 @@ func TestStatement(t *testing.T) {
 func assertTokens(t *testing.T, expected []TokenType, scanner *Scanner) {
 	for _, tokenType := range expected {
 		token := scanner.NextToken()
-		assert.Equal(t, tokenType, token.t)
+		assert.Equal(t, tokenType, token.T)
 	}
 }
 
 func assertLiteral(t *testing.T, expected []interface{}, scanner *Scanner) {
 	for _, literal := range expected {
 		token := scanner.NextToken()
-		assert.Equal(t, literal, token.literal)
+		assert.Equal(t, literal, token.Literal)
 	}
 }
