@@ -63,6 +63,22 @@ type Literal struct {
 	Value interface{}
 }
 
+type Parameter struct {
+	SymbolName *SymbolName
+	N          *scanner.Token
+}
+
+type CaseExpr struct {
+	Init         Expr
+	Alternatives Expr
+	Else         Expr
+}
+
+type CaseAltExpr struct {
+	When Expr
+	Then Expr
+}
+
 func (e *OpExpr) exprNode()             {}
 func (e *UnaryExpr) exprNode()          {}
 func (e *BinaryExpr) exprNode()         {}
@@ -70,6 +86,9 @@ func (e *TernaryExpr) exprNode()        {}
 func (e *ListExpr) exprNode()           {}
 func (e *Literal) exprNode()            {}
 func (e *PropertyLabelsExpr) exprNode() {}
+func (e *Parameter) exprNode()          {}
+func (e *CaseExpr) exprNode()           {}
+func (e *CaseAltExpr) exprNode()        {}
 
 func (s *SymbolName) schemaNameNode()   {}
 func (r *ReservedWord) schemaNameNode() {}

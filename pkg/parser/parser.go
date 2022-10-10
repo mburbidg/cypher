@@ -305,7 +305,7 @@ func (p *Parser) atom() ast.Expr {
 	if expr := p.parameter(); expr != nil {
 		return expr
 	}
-	if expr := p.caseExpr(); expr != nil {
+	if expr, _ := p.caseExpr(); expr != nil {
 		return expr
 	}
 	return nil
@@ -331,13 +331,43 @@ func (p *Parser) literal() ast.Expr {
 
 func (p *Parser) parameter() ast.Expr {
 	if _, ok := p.match(scanner.DollarSign); ok {
-
+		if t, ok := p.match(scanner.Identifier); ok {
+			if symbolType, ok := ast.SymbolNames[t.Lexeme]; ok {
+				return &ast.Parameter{SymbolName: &ast.SymbolName{t, symbolType}}
+			} else {
+				return &ast.Parameter{SymbolName: &ast.SymbolName{t, ast.Identifier}}
+			}
+		}
+		if t, ok := p.match(scanner.DecimalInteger); ok {
+			return &ast.Parameter{N: &t}
+		} else {
+			p.reporter.Error(t.Line, "expecting symbolic name or integer")
+		}
 	}
 	return nil
 }
 
-func (p *Parser) caseExpr() ast.Expr {
-	return nil
+func (p *Parser) caseExpr() (ast.Expr, error) {
+	if _, ok := p.match(scanner.Case); ok {
+		caseAltExpr, err := p.caseAltExpr()
+		for err == nil && caseAltExpr != nil {
+
+		}
+	}
+	return nil, nil
+}
+
+func (p *Parser) caseAltExpr() (ast.Expr, error) {
+	if _, ok := p.match(scanner.When); ok {
+		whenExpr := p.expr()
+		if t, ok := p.match(scanner.Then); ok {
+			thenExpr := p.expr()
+			return &ast.CaseAltExpr{whenExpr, thenExpr}, nil
+		} else {
+			return nil, p.reporter.Error(t.Line, "expecting symbolic name or integer")
+		}
+	}
+	return nil, nil
 }
 
 func (p *Parser) filterExpr() ast.Expr {

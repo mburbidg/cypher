@@ -6,7 +6,9 @@ type StdReporter struct {
 	Cnt int
 }
 
-func (r *StdReporter) Error(line int, msg string) {
+func (r *StdReporter) Error(line int, msg string) error {
 	r.Cnt += 1
-	fmt.Printf("Error: %s (line %d)\n", msg, line)
+	err := &ParseError{line, msg}
+	fmt.Printf("%s\n", err)
+	return err
 }
