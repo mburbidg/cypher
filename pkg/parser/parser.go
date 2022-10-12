@@ -4,6 +4,7 @@ import (
 	"github.com/mburbidg/cypher/pkg/ast"
 	"github.com/mburbidg/cypher/pkg/scanner"
 	"github.com/mburbidg/cypher/pkg/utils"
+	"unicode/utf8"
 )
 
 type Parser struct {
@@ -17,6 +18,8 @@ func New(scanner *scanner.Scanner, reporter utils.Reporter) *Parser {
 		reporter: reporter,
 	}
 }
+
+// Todo: Put must at the start of required expressions and nodes.
 
 func (p *Parser) Parse() ast.Expr {
 	return p.expr()
@@ -37,13 +40,21 @@ func (p *Parser) match(tokenTypes ...scanner.TokenType) (scanner.Token, bool) {
 }
 
 func (p *Parser) matchPhrase(tokenTypes ...scanner.TokenType) bool {
-	for i := 0; i < len(tokenTypes); i++ {
-		if t, ok := p.match(tokenTypes[i]); !ok {
-			p.reporter.Error(t.Line, "expecting phrase")
+	if len(tokenTypes) > 0 {
+		if t := p.scanner.NextToken(); t.T == tokenTypes[0] {
+			if ok := p.matchPhrase(tokenTypes[1:]...); ok {
+				return true
+			} else {
+				p.scanner.ReturnToken(t)
+				return false
+			}
+		} else {
+			p.scanner.ReturnToken(t)
 			return false
 		}
+	} else {
+		return true
 	}
-	return true
 }
 
 func (p *Parser) expr() ast.Expr {
@@ -183,61 +194,60 @@ func (p *Parser) stringListNullOperatorExpr() ast.Expr {
 func (p *Parser) propertyOrLabelsExpr() ast.Expr {
 	atom := p.atom()
 	properties := []ast.SchemaName{}
-	for property := p.propertyLookup(); property != nil; property = p.propertyLookup() {
+	for property, _ := p.propertyLookup(); property != nil; property, _ = p.propertyLookup() {
 		if property != nil {
 			properties = append(properties, property)
 		}
 	}
-	labels := p.NodeLabels()
+	labels, _ := p.NodeLabels()
 	return &ast.PropertyLabelsExpr{atom, properties, labels}
 }
 
-func (p *Parser) propertyLookup() ast.SchemaName {
-	if _, ok := p.match(scanner.Period); ok {
-		if t, ok := p.match(scanner.Identifier); ok {
-			if symbolType, ok := ast.SymbolNames[t.Lexeme]; ok {
-				return &ast.SymbolName{t, symbolType}
-			} else {
-				return &ast.SymbolName{t, ast.Identifier}
-			}
-		}
-		t := p.scanner.NextToken()
-		if _, ok := scanner.ReservedWordTokens[t.T]; ok {
-			return &ast.ReservedWord{t}
-		}
-		p.scanner.ReturnToken(t)
-		p.reporter.Error(t.Line, "expecting symbol name or reserved word")
+func (p *Parser) propertyLookup() (ast.SchemaName, error) {
+	if s, err := p.schemaName(); err == nil {
+		return s, nil
 	}
-	return nil
+	return nil, nil
 }
 
-func (p *Parser) NodeLabels() []ast.SchemaName {
+func (p *Parser) schemaName() (ast.SchemaName, error) {
+	t := p.scanner.NextToken()
+	if _, ok := scanner.ReservedWordTokens[t.T]; ok {
+		return &ast.ReservedWordSchemaName{t.T}, nil
+	}
+	p.scanner.ReturnToken(t)
+	if symbolicName, err := p.symbolicName(); err == nil {
+		return &ast.SymbolicNameSchemaName{symbolicName}, nil
+	} else {
+		return nil, err
+	}
+}
+
+func (p *Parser) NodeLabels() ([]ast.SchemaName, error) {
 	labels := []ast.SchemaName{}
-	for label := p.NodeLabel(); label != nil; label = p.NodeLabel() {
-		if label != nil {
-			labels = append(labels, label)
-		}
+	label, err := p.NodeLabel()
+	for err == nil && label != nil {
+		labels = append(labels, label)
+		label, err = p.NodeLabel()
 	}
-	return labels
+	if err != nil {
+		return nil, err
+	}
+	return labels, nil
 }
 
-func (p *Parser) NodeLabel() ast.SchemaName {
+func (p *Parser) NodeLabel() (ast.SchemaName, error) {
 	if _, ok := p.match(scanner.Colon); ok {
-		if t, ok := p.match(scanner.Identifier); ok {
-			if symbolType, ok := ast.SymbolNames[t.Lexeme]; ok {
-				return &ast.SymbolName{t, symbolType}
-			} else {
-				return &ast.SymbolName{t, ast.Identifier}
-			}
+		s, err := p.schemaName()
+		if err != nil {
+			return nil, err
 		}
-		t := p.scanner.NextToken()
-		if _, ok := scanner.ReservedWordTokens[t.T]; ok {
-			return &ast.ReservedWord{t}
+		if s == nil {
+			p.reporter.Error(p.scanner.Line(), "expecting schema name following ':'")
 		}
-		p.scanner.ReturnToken(t)
-		p.reporter.Error(t.Line, "expecting symbol name or reserved word")
+		return s, nil
 	}
-	return nil
+	return nil, nil
 }
 
 func (p *Parser) isNullExpr() ast.Expr {
@@ -302,10 +312,19 @@ func (p *Parser) atom() ast.Expr {
 	if expr := p.literal(); expr != nil {
 		return expr
 	}
-	if expr := p.parameter(); expr != nil {
+	if expr, _ := p.parameter(); expr != nil {
 		return expr
 	}
 	if expr, _ := p.caseExpr(); expr != nil {
+		return expr
+	}
+	if ok := p.matchPhrase(scanner.Identifier, scanner.OpenParen, scanner.Star, scanner.CloseParen); ok {
+		return &ast.OpExpr{ast.CountAll}
+	}
+	if expr, _ := p.listComprehensionExpr(); expr != nil {
+		return expr
+	}
+	if expr, _ := p.patternComprehensionExpr(); expr != nil {
 		return expr
 	}
 	return nil
@@ -329,40 +348,17 @@ func (p *Parser) literal() ast.Expr {
 	return nil
 }
 
-func (p *Parser) parameter() ast.Expr {
+func (p *Parser) parameter() (ast.Expr, error) {
 	if _, ok := p.match(scanner.DollarSign); ok {
-		if t, ok := p.match(scanner.Identifier); ok {
-			if symbolType, ok := ast.SymbolNames[t.Lexeme]; ok {
-				return &ast.Parameter{SymbolName: &ast.SymbolName{t, symbolType}}
-			} else {
-				return &ast.Parameter{SymbolName: &ast.SymbolName{t, ast.Identifier}}
-			}
+		s, err := p.symbolicName()
+		if err != nil {
+			return nil, err
+		}
+		if s != nil {
+			return &ast.Parameter{SymbolicName: s}, nil
 		}
 		if t, ok := p.match(scanner.DecimalInteger); ok {
-			return &ast.Parameter{N: &t}
-		} else {
-			p.reporter.Error(t.Line, "expecting symbolic name or integer")
-		}
-	}
-	return nil
-}
-
-func (p *Parser) caseExpr() (ast.Expr, error) {
-	if _, ok := p.match(scanner.Case); ok {
-		caseAltExpr, err := p.caseAltExpr()
-		for err == nil && caseAltExpr != nil {
-
-		}
-	}
-	return nil, nil
-}
-
-func (p *Parser) caseAltExpr() (ast.Expr, error) {
-	if _, ok := p.match(scanner.When); ok {
-		whenExpr := p.expr()
-		if t, ok := p.match(scanner.Then); ok {
-			thenExpr := p.expr()
-			return &ast.CaseAltExpr{whenExpr, thenExpr}, nil
+			return &ast.Parameter{N: &t}, nil
 		} else {
 			return nil, p.reporter.Error(t.Line, "expecting symbolic name or integer")
 		}
@@ -370,18 +366,179 @@ func (p *Parser) caseAltExpr() (ast.Expr, error) {
 	return nil, nil
 }
 
-func (p *Parser) filterExpr() ast.Expr {
-	return nil
+func (p *Parser) caseExpr() (ast.Expr, error) {
+	caseExpr := &ast.CaseExpr{}
+	if t, ok := p.match(scanner.Case); ok {
+		caseExpr.Init = p.expr()
+		caseAlt, err := p.caseAlt()
+		for err == nil && caseAlt != nil {
+			caseExpr.Alternatives = append(caseExpr.Alternatives, caseAlt)
+		}
+		if len(caseExpr.Alternatives) == 0 {
+			return nil, p.reporter.Error(t.Line, "expecting WHEN after CASE or CASE initialization expression")
+		}
+		if t, ok := p.match(scanner.Else); ok {
+			caseExpr.Else = p.expr()
+			if caseExpr.Else == nil {
+				return nil, p.reporter.Error(t.Line, "expecting expression after CASE ELSE")
+			}
+		}
+		if t, ok := p.match(scanner.End); ok {
+			return caseExpr, nil
+		} else {
+			return nil, p.reporter.Error(t.Line, "expecting CASE END")
+		}
+	}
+	return nil, nil
+}
+
+func (p *Parser) caseAlt() (*ast.CaseAltNode, error) {
+	if _, ok := p.match(scanner.When); ok {
+		whenExpr := p.expr()
+		if t, ok := p.match(scanner.Then); ok {
+			thenExpr := p.expr()
+			return &ast.CaseAltNode{whenExpr, thenExpr}, nil
+		} else {
+			return nil, p.reporter.Error(t.Line, "expecting symbolic name or integer")
+		}
+	}
+	return nil, nil
+}
+
+func (p *Parser) listComprehensionExpr() (ast.Expr, error) {
+	if _, ok := p.match(scanner.OpenBracket); !ok {
+		return nil, nil
+	}
+	var err error
+	listCompExpr := &ast.ListComprehensionExpr{}
+	listCompExpr.FilterExpr, err = p.filterExpr()
+	if err != nil {
+		return nil, err
+	}
+	if t, ok := p.match(scanner.Pipe); !ok {
+		return nil, p.reporter.Error(t.Line, "expecting '|' in list expression")
+	}
+	listCompExpr.Expr = p.expr()
+	if listCompExpr.Expr == nil {
+		return nil, p.reporter.Error(p.scanner.Line(), "expecting expression after '|'")
+	}
+	if t, ok := p.match(scanner.CloseBracket); !ok {
+		return nil, p.reporter.Error(t.Line, "expecting ']'")
+	}
+	return listCompExpr, nil
+}
+
+func (p *Parser) filterExpr() (ast.Expr, error) {
+	filterExpr := &ast.FilterExpr{}
+	var err error
+	filterExpr.Variable, err = p.variable()
+	if err != nil {
+		return nil, err
+	}
+	if filterExpr.Variable == nil {
+		return nil, p.reporter.Error(p.scanner.Line(), "expecting variable")
+	}
+	if t, ok := p.match(scanner.In); !ok {
+		return nil, p.reporter.Error(t.Line, "expecting 'IN'")
+	}
+	if filterExpr.InExpr = p.expr(); filterExpr.InExpr == nil {
+		return nil, p.reporter.Error(p.scanner.Line(), "expecting 'IN' expression")
+	}
+	if _, ok := p.match(scanner.Where); ok {
+		if filterExpr.WhereExpr = p.expr(); filterExpr.WhereExpr == nil {
+			return nil, p.reporter.Error(p.scanner.Line(), "expecting 'WHERE' expression")
+		}
+	}
+	return filterExpr, nil
+}
+
+var builtInNames = map[string]ast.Operator{
+	"ALL":    ast.AllOp,
+	"ANY":    ast.AnyOp,
+	"NONE":   ast.NoneOp,
+	"SINGLE": ast.SingleOp,
+}
+
+func (p *Parser) builtInFunction() (ast.Expr, error) {
+	if t, ok := p.match(scanner.Identifier); ok {
+		if op, ok := builtInNames[t.Lexeme]; ok {
+			if _, ok := p.match(scanner.OpenParen); !ok {
+				return nil, p.reporter.Error(p.scanner.Line(), "expecting '('")
+			}
+			expr, err := p.filterExpr()
+			if err != nil {
+				return nil, err
+			}
+			if expr == nil {
+				return nil, p.reporter.Error(p.scanner.Line(), "expecting filter expression")
+			}
+			if _, ok := p.match(scanner.OpenParen); !ok {
+				return nil, p.reporter.Error(p.scanner.Line(), "expecting ')'")
+			}
+			return &ast.BuiltInExpr{op, expr}, nil
+		} else {
+			p.scanner.ReturnToken(t)
+		}
+	}
+	return nil, nil
 }
 
 func (p *Parser) functionInvocation() ast.Expr {
 	return nil
 }
 
-func (p *Parser) variable() ast.Expr {
-	return nil
+func (p *Parser) variable() (ast.Expr, error) {
+	s, err := p.symbolicName()
+	if err != nil {
+		return nil, err
+	}
+	if s == nil {
+		return nil, p.reporter.Error(p.scanner.Line(), "expecting variable")
+	}
+	return &ast.VariableExpr{s}, nil
 }
 
-func (p *Parser) patternComprehension() ast.Expr {
-	return nil
+func (p *Parser) symbolicName() (ast.SymbolicName, error) {
+	if t, ok := p.match(scanner.Identifier); ok {
+		if symbolType, ok := ast.SymbolNames[t.Lexeme]; ok {
+			return &ast.SymbolicNameIdentifier{t, symbolType}, nil
+		}
+		if len(t.Lexeme) == 1 {
+			switch ch, _ := utf8.DecodeLastRuneInString(t.Lexeme); ch {
+			case 'a', 'b', 'c', 'd', 'e', 'f':
+				return &ast.SymbolicNameHexLetter{ch}, nil
+			}
+			return &ast.SymbolicNameIdentifier{t, ast.Identifier}, nil
+		}
+	}
+	return nil, nil
+}
+
+func (p *Parser) patternComprehensionExpr() (ast.Expr, error) {
+	var err error
+	patternExpr := &ast.PatternComprehensionExpr{}
+	if _, ok := p.match(scanner.OpenBracket); !ok {
+		return nil, nil
+	}
+	patternExpr.Variable, err = p.variable()
+	if err != nil {
+		return nil, err
+	}
+	if patternExpr.Variable != nil {
+		if t, ok := p.match(scanner.Equal); !ok {
+			return nil, p.reporter.Error(t.Line, "expecting '=' following variable")
+		}
+	}
+	patternExpr.ReltionshipsPattern, err = p.reltionshipsPattern()
+
+	// Work in progress.
+	
+	if t, ok := p.match(scanner.CloseBracket); !ok {
+		return nil, p.reporter.Error(t.Line, "expecting ']'")
+	}
+	return nil, nil
+}
+
+func (p *Parser) reltionshipsPattern() (*ast.ReltionshipsPattern, error) {
+	return nil, nil
 }

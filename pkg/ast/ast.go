@@ -36,6 +36,11 @@ type ListExpr struct {
 	List []Expr
 }
 
+type ListComprehensionExpr struct {
+	FilterExpr Expr
+	Expr       Expr
+}
+
 type PropertyLabelsExpr struct {
 	Atom         Expr
 	PropertyKeys []SchemaName
@@ -46,9 +51,25 @@ type SchemaName interface {
 	schemaNameNode()
 }
 
-type SymbolName struct {
+type SymbolicNameSchemaName struct {
+	SymbolicName SymbolicName
+}
+
+type ReservedWordSchemaName struct {
+	TokenType scanner.TokenType
+}
+
+type SymbolicName interface {
+	symbolicNameNode()
+}
+
+type SymbolicNameIdentifier struct {
 	Identifier scanner.Token
 	Type       SymbolType
+}
+
+type SymbolicNameHexLetter struct {
+	Letter rune
 }
 
 type ReservedWord struct {
@@ -64,31 +85,63 @@ type Literal struct {
 }
 
 type Parameter struct {
-	SymbolName *SymbolName
-	N          *scanner.Token
+	SymbolicName SymbolicName
+	N            *scanner.Token
 }
 
 type CaseExpr struct {
 	Init         Expr
-	Alternatives Expr
+	Alternatives []*CaseAltNode
 	Else         Expr
 }
 
-type CaseAltExpr struct {
+type CaseAltNode struct {
 	When Expr
 	Then Expr
 }
 
-func (e *OpExpr) exprNode()             {}
-func (e *UnaryExpr) exprNode()          {}
-func (e *BinaryExpr) exprNode()         {}
-func (e *TernaryExpr) exprNode()        {}
-func (e *ListExpr) exprNode()           {}
-func (e *Literal) exprNode()            {}
-func (e *PropertyLabelsExpr) exprNode() {}
-func (e *Parameter) exprNode()          {}
-func (e *CaseExpr) exprNode()           {}
-func (e *CaseAltExpr) exprNode()        {}
+type BuiltInExpr struct {
+	Op   Operator
+	Expr Expr
+}
 
-func (s *SymbolName) schemaNameNode()   {}
-func (r *ReservedWord) schemaNameNode() {}
+type FilterExpr struct {
+	Variable  Expr
+	InExpr    Expr
+	WhereExpr Expr
+}
+
+type VariableExpr struct {
+	SymbolicName SymbolicName
+}
+
+type PatternComprehensionExpr struct {
+	Variable            Expr
+	ReltionshipsPattern *ReltionshipsPattern
+	WhereExpr           Expr
+	PipeExpr            Expr
+}
+
+type ReltionshipsPattern struct {
+}
+
+func (e *OpExpr) exprNode()                   {}
+func (e *UnaryExpr) exprNode()                {}
+func (e *BinaryExpr) exprNode()               {}
+func (e *TernaryExpr) exprNode()              {}
+func (e *ListExpr) exprNode()                 {}
+func (e *Literal) exprNode()                  {}
+func (e *PropertyLabelsExpr) exprNode()       {}
+func (e *Parameter) exprNode()                {}
+func (e *CaseExpr) exprNode()                 {}
+func (e *ListComprehensionExpr) exprNode()    {}
+func (e *FilterExpr) exprNode()               {}
+func (e *BuiltInExpr) exprNode()              {}
+func (e *VariableExpr) exprNode()             {}
+func (e *PatternComprehensionExpr) exprNode() {}
+
+func (s *SymbolicNameIdentifier) symbolicNameNode() {}
+func (s *SymbolicNameHexLetter) symbolicNameNode()  {}
+
+func (r *SymbolicNameSchemaName) schemaNameNode() {}
+func (r *ReservedWordSchemaName) schemaNameNode() {}

@@ -31,6 +31,7 @@ const (
 	GreaterThanOrEqual
 	DollarSign
 	Colon
+	Pipe
 
 	Identifier
 	Double

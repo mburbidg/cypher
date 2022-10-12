@@ -19,6 +19,11 @@ const (
 	InList
 	ListIndex
 	ListRange
+	CountAll
+	AllOp
+	AnyOp
+	NoneOp
+	SingleOp
 )
 
 const (

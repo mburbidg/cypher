@@ -2,6 +2,7 @@ package scanner
 
 import (
 	"bytes"
+	"github.com/mburbidg/cypher/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -21,11 +22,12 @@ func newTestReporter() *testReporter {
 	}
 }
 
-func (r *testReporter) Error(line int, msg string) {
+func (r *testReporter) Error(line int, msg string) error {
 	r.errors = append(r.errors, errorMsg{
 		line: line,
 		msg:  msg,
 	})
+	return utils.ParseError{line, msg}
 }
 
 func TestScanner(t *testing.T) {

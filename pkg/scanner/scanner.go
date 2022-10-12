@@ -81,6 +81,10 @@ func (s *Scanner) popToken() (Token, bool) {
 	return Token{}, false
 }
 
+func (s *Scanner) Line() int {
+	return s.line
+}
+
 func (s *Scanner) ReturnToken(token Token) {
 	s.pushToken(token)
 }
@@ -170,6 +174,8 @@ func (s *Scanner) NextToken() Token {
 		return newOperatorToken(DollarSign, s.line)
 	case ch == ':':
 		return newOperatorToken(Colon, s.line)
+	case ch == '|':
+		return newOperatorToken(Pipe, s.line)
 	case unicode.IsDigit(ch):
 		return s.scanNumber(ch)
 	case ch == '"', ch == '\'':
