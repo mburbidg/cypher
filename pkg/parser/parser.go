@@ -4,6 +4,7 @@ import (
 	"github.com/mburbidg/cypher/pkg/ast"
 	"github.com/mburbidg/cypher/pkg/scanner"
 	"github.com/mburbidg/cypher/pkg/utils"
+	"math"
 	"unicode/utf8"
 )
 
@@ -529,16 +530,258 @@ func (p *Parser) patternComprehensionExpr() (ast.Expr, error) {
 			return nil, p.reporter.Error(t.Line, "expecting '=' following variable")
 		}
 	}
-	patternExpr.ReltionshipsPattern, err = p.reltionshipsPattern()
-
-	// Work in progress.
-	
+	patternExpr.ReltionshipsPattern, err = p.mustRelationshipsPattern()
+	if patternExpr.ReltionshipsPattern == nil {
+		return nil, p.reporter.Error(p.scanner.Line(), "expecting relationship pattern")
+	}
+	if _, ok := p.match(scanner.Where); ok {
+		patternExpr.WhereExpr = p.expr()
+		if p.expr() == nil {
+			return nil, p.reporter.Error(p.scanner.Line(), "expecting expression following 'WHERE'")
+		}
+	}
+	if t, ok := p.match(scanner.Pipe); !ok {
+		return nil, p.reporter.Error(t.Line, "expecting '|'")
+	}
+	patternExpr.PipeExpr = p.expr()
+	if p.expr() == nil {
+		return nil, p.reporter.Error(p.scanner.Line(), "expecting expression following '|'")
+	}
 	if t, ok := p.match(scanner.CloseBracket); !ok {
 		return nil, p.reporter.Error(t.Line, "expecting ']'")
 	}
 	return nil, nil
 }
 
-func (p *Parser) reltionshipsPattern() (*ast.ReltionshipsPattern, error) {
+func (p *Parser) mustRelationshipsPattern() (*ast.RelationshipsPattern, error) {
+	var err error
+	rel := &ast.RelationshipsPattern{
+		Chain: []*ast.PatternElementChain{},
+	}
+	rel.Left, err = p.nodePattern()
+	if err != nil {
+		return nil, err
+	}
+	if rel.Left == nil {
+		return nil, p.reporter.Error(p.scanner.Line(), "expecting node pattern")
+	}
+	chain, err := p.patternElementChain()
+	if err != nil {
+		return nil, err
+	}
+	if chain == nil {
+		return nil, p.reporter.Error(p.scanner.Line(), "expecting pattern element chain")
+	}
+	rel.Chain = append(rel.Chain, chain)
+	for {
+		chain, err := p.patternElementChain()
+		if err != nil {
+			return nil, err
+		}
+		if chain == nil {
+			break
+		}
+		rel.Chain = append(rel.Chain, chain)
+	}
+	return rel, nil
+}
+
+func (p *Parser) patternElementChain() (*ast.PatternElementChain, error) {
+	var err error
+	chain := &ast.PatternElementChain{}
+	chain.RelationshipPattern, err = p.relationshipPattern()
+	if err != nil {
+		return nil, err
+	}
+	if chain.RelationshipPattern == nil {
+		return nil, nil
+	}
+	chain.Right, err = p.nodePattern()
+	if err != nil {
+		return nil, err
+	}
+	if chain.Right == nil {
+		return nil, p.reporter.Error(p.scanner.Line(), "expecting node pattern")
+	}
+	return chain, nil
+}
+
+func (p *Parser) relationshipPattern() (*ast.RelationshipPattern, error) {
+	var err error
+	pattern := &ast.RelationshipPattern{Left: ast.Undirected, Right: ast.Undirected}
+	t, ok := p.match(scanner.LessThan)
+	if ok {
+		pattern.Left = ast.Directed
+	}
+	if _, ok := p.match(scanner.Dash); !ok {
+		p.scanner.ReturnToken(t)
+		return nil, nil
+	}
+	pattern.RelationshipDetail, err = p.relationshipDetail()
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := p.match(scanner.Dash); !ok {
+		return nil, p.reporter.Error(p.scanner.Line(), "expecting '-'")
+	}
+	if _, ok := p.match(scanner.GreaterThan); ok {
+		pattern.Right = ast.Directed
+	}
+	return pattern, nil
+}
+
+func (p *Parser) relationshipDetail() (*ast.RelationshipDetail, error) {
+	var err error
+	if _, ok := p.match(scanner.OpenBracket); !ok {
+		return nil, nil
+	}
+	detail := &ast.RelationshipDetail{}
+	detail.Variable, err = p.variable()
+	if err != nil {
+		return nil, err
+	}
+	detail.RelationshipTypes, err = p.relationshipTypes()
+	if err != nil {
+		return nil, err
+	}
+	detail.RangeLiteral, err = p.rangeLiteral()
+	if err != nil {
+		return nil, err
+	}
+	detail.Properties, err = p.properties()
+	if err != nil {
+		return nil, err
+	}
+	if t, ok := p.match(scanner.CloseBracket); !ok {
+		return nil, p.reporter.Error(t.Line, "expecting ']'")
+	}
+	return detail, nil
+}
+
+func (p *Parser) properties() (*ast.Properties, error) {
+	var err error
+	properties := &ast.Properties{}
+	properties.MapLiteral, err = p.mapLiteral()
+	if err != nil {
+		return nil, err
+	}
+	if properties.MapLiteral != nil {
+		return properties, nil
+	}
+	properties.Parameter, err = p.parameter()
+	if err != nil {
+		return nil, err
+	}
+	if properties.Parameter != nil {
+		return properties, nil
+	}
 	return nil, nil
+}
+
+func (p *Parser) rangeLiteral() (*ast.RangeLiteral, error) {
+	literal := &ast.RangeLiteral{Begin: math.MinInt64, End: math.MaxInt64}
+	if _, ok := p.match(scanner.Star); !ok {
+		return nil, nil
+	}
+	if t, ok := p.match(scanner.Integer); ok {
+		literal.Begin = t.Literal.(int64)
+	}
+	if _, ok := p.match(scanner.Dotdot); ok {
+		if t, ok := p.match(scanner.Integer); ok {
+			literal.End = t.Literal.(int64)
+		}
+	}
+	return literal, nil
+}
+
+func (p *Parser) relationshipTypes() ([]ast.SchemaName, error) {
+	if _, ok := p.match(scanner.Colon); !ok {
+		return nil, nil
+	}
+	typeNames := []ast.SchemaName{}
+	s, err := p.schemaName()
+	if err != nil {
+		return nil, err
+	}
+	if s == nil {
+		return nil, p.reporter.Error(p.scanner.Line(), "expecting relationship type name")
+	}
+	typeNames = append(typeNames, s)
+	for {
+		if _, ok := p.match(scanner.Pipe); !ok {
+			return typeNames, nil
+		}
+		p.match(scanner.Colon)
+		s, err := p.schemaName()
+		if err != nil {
+			return nil, err
+		}
+		if s == nil {
+			return nil, p.reporter.Error(p.scanner.Line(), "expecting relationship type name")
+		}
+	}
+}
+
+func (p *Parser) nodePattern() (*ast.NodePattern, error) {
+	if _, ok := p.match(scanner.OpenParen); !ok {
+		return nil, nil
+	}
+	var err error
+	np := &ast.NodePattern{}
+	np.Variable, err = p.variable()
+	if err != nil {
+		return nil, err
+	}
+	np.Labels, err = p.NodeLabels()
+	if err != nil {
+		return nil, err
+	}
+	literal, err := p.mapLiteral()
+	if err != nil {
+		return nil, err
+	}
+	if literal == nil {
+		parameter, err := p.parameter()
+		if err != nil {
+			return nil, err
+		}
+		if parameter != nil {
+			np.Properties = &ast.Properties{Parameter: parameter}
+		}
+	} else {
+		np.Properties = &ast.Properties{MapLiteral: literal}
+	}
+	if t, ok := p.match(scanner.CloseParen); !ok {
+		return nil, p.reporter.Error(t.Line, "expecting ')' following node pattern")
+	}
+	return np, nil
+}
+
+func (p *Parser) mapLiteral() (*ast.MapLiteral, error) {
+	if _, ok := p.match(scanner.OpenBrace); !ok {
+		return nil, nil
+	}
+	literal := &ast.MapLiteral{PropertyKeyNames: []*ast.PropertyKeyNames{}}
+	for {
+		var err error
+		pkn := &ast.PropertyKeyNames{}
+		pkn.Name, err = p.schemaName()
+		if err != nil {
+			return nil, err
+		}
+		if pkn.Name == nil {
+			break
+		}
+		if t, ok := p.match(scanner.Colon); !ok {
+			return nil, p.reporter.Error(t.Line, "expecting '}' following map literal")
+		}
+		if pkn.Expr = p.expr(); pkn.Expr == nil {
+			return nil, p.reporter.Error(p.scanner.Line(), "expecting expression following ':'")
+		}
+		literal.PropertyKeyNames = append(literal.PropertyKeyNames, pkn)
+	}
+	if t, ok := p.match(scanner.CloseBrace); !ok {
+		return nil, p.reporter.Error(t.Line, "expecting '}' following map literal")
+	}
+	return literal, nil
 }

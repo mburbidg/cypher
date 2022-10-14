@@ -32,6 +32,7 @@ const (
 	DollarSign
 	Colon
 	Pipe
+	Dash
 
 	Identifier
 	Double

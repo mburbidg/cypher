@@ -176,6 +176,8 @@ func (s *Scanner) NextToken() Token {
 		return newOperatorToken(Colon, s.line)
 	case ch == '|':
 		return newOperatorToken(Pipe, s.line)
+	case ch == '-':
+		return newOperatorToken(Dash, s.line)
 	case unicode.IsDigit(ch):
 		return s.scanNumber(ch)
 	case ch == '"', ch == '\'':

@@ -117,12 +117,57 @@ type VariableExpr struct {
 
 type PatternComprehensionExpr struct {
 	Variable            Expr
-	ReltionshipsPattern *ReltionshipsPattern
+	ReltionshipsPattern *RelationshipsPattern
 	WhereExpr           Expr
 	PipeExpr            Expr
 }
 
-type ReltionshipsPattern struct {
+type NodePattern struct {
+	Variable   Expr
+	Labels     []SchemaName
+	Properties *Properties
+}
+
+type MapLiteral struct {
+	PropertyKeyNames []*PropertyKeyNames
+}
+
+type PropertyKeyNames struct {
+	Name SchemaName
+	Expr Expr
+}
+
+type Properties struct {
+	MapLiteral *MapLiteral
+	Parameter  Expr
+}
+
+type RelationshipsPattern struct {
+	Left  *NodePattern
+	Chain []*PatternElementChain
+}
+
+type PatternElementChain struct {
+	RelationshipPattern *RelationshipPattern
+	Right               *NodePattern
+}
+
+type RelationshipPattern struct {
+	Left               Relationship
+	Right              Relationship
+	RelationshipDetail *RelationshipDetail
+}
+
+type RelationshipDetail struct {
+	Variable          Expr
+	RelationshipTypes []SchemaName
+	RangeLiteral      *RangeLiteral
+	Properties        *Properties
+}
+
+type RangeLiteral struct {
+	Begin int64
+	End   int64
 }
 
 func (e *OpExpr) exprNode()                   {}
