@@ -5,6 +5,7 @@ import (
 	"github.com/mburbidg/cypher/pkg/scanner"
 	"github.com/mburbidg/cypher/pkg/utils"
 	"github.com/stretchr/testify/assert"
+	"log"
 	"testing"
 )
 
@@ -37,4 +38,13 @@ func TestMatchPhrase(t *testing.T) {
 	p := New(s, reporter)
 	assert.False(t, p.matchPhrase(scanner.Identifier, scanner.OpenParen, scanner.Colon, scanner.CloseParen, scanner.EndOfInput))
 	assert.True(t, p.matchPhrase(scanner.Identifier, scanner.OpenParen, scanner.Star, scanner.CloseParen, scanner.EndOfInput))
+}
+
+func TestAdditionExpr(t *testing.T) {
+	reporter := newTestReporter()
+	s := scanner.New(bytes.NewBufferString("3 + 5"), reporter)
+	p := New(s, reporter)
+	ast, err := p.Parse()
+	assert.NoError(t, err)
+	log.Printf("ast=%v\n", ast)
 }

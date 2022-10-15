@@ -20,9 +20,7 @@ func New(scanner *scanner.Scanner, reporter utils.Reporter) *Parser {
 	}
 }
 
-// Todo: Put must at the start of required expressions and nodes.
-
-func (p *Parser) Parse() ast.Expr {
+func (p *Parser) Parse() (ast.Expr, error) {
 	return p.expr()
 }
 
@@ -58,47 +56,71 @@ func (p *Parser) matchPhrase(tokenTypes ...scanner.TokenType) bool {
 	}
 }
 
-func (p *Parser) expr() ast.Expr {
+func (p *Parser) expr() (ast.Expr, error) {
 	return p.orExpr()
 }
 
-func (p *Parser) orExpr() ast.Expr {
-	expr := p.xorExpr()
+func (p *Parser) orExpr() (ast.Expr, error) {
+	expr, err := p.xorExpr()
+	if err != nil {
+		return nil, err
+	}
 	for _, ok := p.match(scanner.Or); ok; _, ok = p.match(scanner.Or) {
-		expr = &ast.BinaryExpr{expr, ast.Or, p.xorExpr()}
+		right, err := p.xorExpr()
+		if err != nil {
+			return nil, err
+		}
+		expr = &ast.BinaryExpr{expr, ast.Or, right}
 	}
-	return expr
+	return expr, nil
 }
 
-func (p *Parser) xorExpr() ast.Expr {
-	expr := p.andExpr()
+func (p *Parser) xorExpr() (ast.Expr, error) {
+	expr, err := p.andExpr()
+	if err != nil {
+		return nil, err
+	}
 	for _, ok := p.match(scanner.Xor); ok; _, ok = p.match(scanner.Xor) {
-		expr = &ast.BinaryExpr{expr, ast.Xor, p.andExpr()}
+		right, err := p.andExpr()
+		if err != nil {
+			return nil, err
+		}
+		expr = &ast.BinaryExpr{expr, ast.Xor, right}
 	}
-	return expr
+	return expr, nil
 }
 
-func (p *Parser) andExpr() ast.Expr {
-	expr := p.notExpr()
+func (p *Parser) andExpr() (ast.Expr, error) {
+	expr, err := p.notExpr()
+	if err != nil {
+		return nil, err
+	}
 	for _, ok := p.match(scanner.And); ok; _, ok = p.match(scanner.And) {
-		expr = &ast.BinaryExpr{expr, ast.And, p.notExpr()}
+		right, err := p.notExpr()
+		if err != nil {
+			return nil, err
+		}
+		expr = &ast.BinaryExpr{expr, ast.And, right}
 	}
-	return expr
+	return expr, nil
 }
 
-func (p *Parser) notExpr() ast.Expr {
+func (p *Parser) notExpr() (ast.Expr, error) {
 	not := false
-	for _, ok := p.match(scanner.Not); ok; _, ok = p.match(scanner.And) {
+	for _, ok := p.match(scanner.Not); ok; _, ok = p.match(scanner.Not) {
 		not = !not
 	}
-	expr := p.comparisonExpr()
+	expr, err := p.comparisonExpr()
+	if err != nil {
+		return nil, err
+	}
 	if not {
 		expr = &ast.UnaryExpr{ast.Not, expr}
 	}
-	return expr
+	return expr, nil
 }
 
-func (p *Parser) comparisonExpr() ast.Expr {
+func (p *Parser) comparisonExpr() (ast.Expr, error) {
 	tokenTypes := []scanner.TokenType{
 		scanner.Equal,
 		scanner.NotEqual,
@@ -107,50 +129,75 @@ func (p *Parser) comparisonExpr() ast.Expr {
 		scanner.LessThanOrEqual,
 		scanner.GreaterThanOrEqual,
 	}
-	expr := p.addOrSubtractExpr()
-	for t, ok := p.match(tokenTypes...); ok; _, ok = p.match(tokenTypes...) {
-		expr = &ast.BinaryExpr{expr, ast.Operator(t.T), p.addOrSubtractExpr()}
+	expr, err := p.addOrSubtractExpr()
+	if err != nil {
+		return nil, err
 	}
-	return expr
+	for t, ok := p.match(tokenTypes...); ok; _, ok = p.match(tokenTypes...) {
+		right, err := p.addOrSubtractExpr()
+		if err != nil {
+			return nil, err
+		}
+		expr = &ast.BinaryExpr{expr, ast.Operator(t.T), right}
+	}
+	return expr, nil
 }
 
-func (p *Parser) addOrSubtractExpr() ast.Expr {
+func (p *Parser) addOrSubtractExpr() (ast.Expr, error) {
 	tokenTypes := []scanner.TokenType{
 		scanner.Plus,
 		scanner.Minus,
 	}
-	expr := p.multiplyDivideModuloExpr()
-	for t, ok := p.match(tokenTypes...); ok; _, ok = p.match(tokenTypes...) {
-		expr = &ast.BinaryExpr{expr, ast.Operator(t.T), p.multiplyDivideModuloExpr()}
+	expr, err := p.multiplyDivideModuloExpr()
+	if err != nil {
+		return nil, err
 	}
-	return expr
+	for t, ok := p.match(tokenTypes...); ok; _, ok = p.match(tokenTypes...) {
+		right, err := p.multiplyDivideModuloExpr()
+		if err != nil {
+			return nil, err
+		}
+		expr = &ast.BinaryExpr{expr, ast.Operator(t.T), right}
+	}
+	return expr, nil
 }
 
-func (p *Parser) multiplyDivideModuloExpr() ast.Expr {
+func (p *Parser) multiplyDivideModuloExpr() (ast.Expr, error) {
 	tokenTypes := []scanner.TokenType{
 		scanner.Star,
 		scanner.ForwardSlash,
 		scanner.Percent,
 	}
-	expr := p.powerExpr()
-	for t, ok := p.match(tokenTypes...); ok; _, ok = p.match(tokenTypes...) {
-		expr = &ast.BinaryExpr{expr, ast.Operator(t.T), p.powerExpr()}
+	expr, err := p.powerExpr()
+	if err != nil {
+		return nil, err
 	}
-	return expr
+	for t, ok := p.match(tokenTypes...); ok; _, ok = p.match(tokenTypes...) {
+		right, err := p.powerExpr()
+		if err != nil {
+			return nil, err
+		}
+		expr = &ast.BinaryExpr{expr, ast.Operator(t.T), right}
+	}
+	return expr, nil
 }
 
-func (p *Parser) powerExpr() ast.Expr {
-	tokenTypes := []scanner.TokenType{
-		scanner.Caret,
+func (p *Parser) powerExpr() (ast.Expr, error) {
+	expr, err := p.unaryAddOrSubtract()
+	if err != nil {
+		return nil, err
 	}
-	expr := p.unaryAddOrSubtract()
-	for t, ok := p.match(tokenTypes...); ok; _, ok = p.match(tokenTypes...) {
-		expr = &ast.BinaryExpr{expr, ast.Operator(t.T), p.unaryAddOrSubtract()}
+	for t, ok := p.match(scanner.Caret); ok; _, ok = p.match(scanner.Caret) {
+		right, err := p.unaryAddOrSubtract()
+		if err != nil {
+			return nil, err
+		}
+		expr = &ast.BinaryExpr{expr, ast.Operator(t.T), right}
 	}
-	return expr
+	return expr, nil
 }
 
-func (p *Parser) unaryAddOrSubtract() ast.Expr {
+func (p *Parser) unaryAddOrSubtract() (ast.Expr, error) {
 	tokenTypes := []scanner.TokenType{
 		scanner.Plus,
 		scanner.Minus,
@@ -161,22 +208,32 @@ func (p *Parser) unaryAddOrSubtract() ast.Expr {
 			negate = !negate
 		}
 	}
-	expr := p.stringListNullOperatorExpr()
+	expr, err := p.stringListNullOperatorExpr()
+	if err != nil {
+		return nil, err
+	}
 	if negate {
 		expr = &ast.UnaryExpr{ast.Negate, expr}
 	}
-	return expr
+	return expr, nil
 }
 
-func (p *Parser) stringListNullOperatorExpr() ast.Expr {
-	expr := p.propertyOrLabelsExpr()
+func (p *Parser) stringListNullOperatorExpr() (ast.Expr, error) {
+	expr, err := p.propertyOrLabelsExpr()
+	if err != nil {
+		return nil, err
+	}
 	list := []ast.Expr{}
 	for {
-		if expr := p.stringOpExpr(); expr != nil {
+		if expr, err := p.stringOpExpr(); err != nil {
+			return nil, err
+		} else if expr != nil {
 			list = append(list, expr)
 			continue
 		}
-		if expr := p.listOpExpr(); expr != nil {
+		if expr, err := p.listOpExpr(); err != nil {
+			return nil, err
+		} else if expr != nil {
 			list = append(list, expr)
 			continue
 		}
@@ -187,13 +244,16 @@ func (p *Parser) stringListNullOperatorExpr() ast.Expr {
 		break
 	}
 	if len(list) > 0 {
-		return &ast.BinaryExpr{expr, ast.StringOrListOp, &ast.ListExpr{list}}
+		return &ast.BinaryExpr{expr, ast.StringOrListOp, &ast.ListExpr{list}}, nil
 	}
-	return expr
+	return expr, nil
 }
 
-func (p *Parser) propertyOrLabelsExpr() ast.Expr {
-	atom := p.atom()
+func (p *Parser) propertyOrLabelsExpr() (ast.Expr, error) {
+	atom, err := p.atom()
+	if err != nil {
+		return nil, err
+	}
 	properties := []ast.SchemaName{}
 	for property, _ := p.propertyLookup(); property != nil; property, _ = p.propertyLookup() {
 		if property != nil {
@@ -201,7 +261,7 @@ func (p *Parser) propertyOrLabelsExpr() ast.Expr {
 		}
 	}
 	labels, _ := p.NodeLabels()
-	return &ast.PropertyLabelsExpr{atom, properties, labels}
+	return &ast.PropertyLabelsExpr{atom, properties, labels}, nil
 }
 
 func (p *Parser) propertyLookup() (ast.SchemaName, error) {
@@ -217,11 +277,14 @@ func (p *Parser) schemaName() (ast.SchemaName, error) {
 		return &ast.ReservedWordSchemaName{t.T}, nil
 	}
 	p.scanner.ReturnToken(t)
-	if symbolicName, err := p.symbolicName(); err == nil {
-		return &ast.SymbolicNameSchemaName{symbolicName}, nil
-	} else {
+	name, err := p.symbolicName()
+	if err != nil {
 		return nil, err
 	}
+	if name != nil {
+		return &ast.SymbolicNameSchemaName{name}, nil
+	}
+	return nil, nil
 }
 
 func (p *Parser) NodeLabels() ([]ast.SchemaName, error) {
@@ -265,82 +328,112 @@ func (p *Parser) isNullExpr() ast.Expr {
 	return nil
 }
 
-func (p *Parser) stringOpExpr() ast.Expr {
+func (p *Parser) stringOpExpr() (ast.Expr, error) {
 	if t, ok := p.match(scanner.Starts, scanner.Ends); ok {
 		if _, ok := p.match(scanner.With); ok {
-			expr := p.propertyOrLabelsExpr()
+			expr, err := p.propertyOrLabelsExpr()
+			if err != nil {
+				return nil, err
+			}
 			switch t.T {
 			case scanner.Starts:
-				return &ast.UnaryExpr{ast.StartsWith, expr}
+				return &ast.UnaryExpr{ast.StartsWith, expr}, nil
 			case scanner.Ends:
-				return &ast.UnaryExpr{ast.EndsWith, expr}
+				return &ast.UnaryExpr{ast.EndsWith, expr}, nil
 			}
 		}
 		p.reporter.Error(t.Line, "expecting WITH")
 	}
 	if _, ok := p.match(scanner.Contains); ok {
-		expr := p.propertyOrLabelsExpr()
-		return &ast.UnaryExpr{ast.Contains, expr}
+		expr, err := p.propertyOrLabelsExpr()
+		if err != nil {
+			return nil, err
+		}
+		return &ast.UnaryExpr{ast.Contains, expr}, nil
 	}
-	return nil
+	return nil, nil
 }
 
-func (p *Parser) listOpExpr() ast.Expr {
+func (p *Parser) listOpExpr() (ast.Expr, error) {
 	if _, ok := p.match(scanner.In); ok {
-		list := p.propertyOrLabelsExpr()
-		return &ast.UnaryExpr{ast.InList, list}
+		list, err := p.propertyOrLabelsExpr()
+		if err != nil {
+			return nil, err
+		}
+		return &ast.UnaryExpr{ast.InList, list}, nil
 	}
 	if _, ok := p.match(scanner.OpenBracket); ok {
-		start := p.expr()
+		start, err := p.expr()
+		if err != nil {
+			return nil, err
+		}
 		if t, ok := p.match(scanner.CloseBracket, scanner.Dotdot); ok {
 			switch t.T {
 			case scanner.CloseBracket:
 				if start == nil {
-					p.reporter.Error(t.Line, "expecting index expression")
-					return nil
+					return nil, p.reporter.Error(t.Line, "expecting index expression")
 				}
-				return &ast.UnaryExpr{ast.ListIndex, start}
+				return &ast.UnaryExpr{ast.ListIndex, start}, nil
 			case scanner.Dotdot:
-				end := p.expr()
-				return &ast.BinaryExpr{start, ast.ListRange, end}
+				end, err := p.expr()
+				if err != nil {
+					return nil, err
+				}
+				return &ast.BinaryExpr{start, ast.ListRange, end}, nil
 			}
 		}
 	}
-	return nil
+	return nil, nil
 }
 
-func (p *Parser) atom() ast.Expr {
+func (p *Parser) atom() (ast.Expr, error) {
 	if expr := p.literal(); expr != nil {
-		return expr
+		return expr, nil
 	}
-	if expr, _ := p.parameter(); expr != nil {
-		return expr
+	if expr, err := p.parameter(); err != nil {
+		return nil, err
+	} else if expr != nil {
+		return expr, nil
 	}
-	if expr, _ := p.caseExpr(); expr != nil {
-		return expr
+	if expr, err := p.caseExpr(); err != nil {
+		return nil, err
+	} else if expr != nil {
+		return expr, nil
 	}
 	if ok := p.matchPhrase(scanner.Identifier, scanner.OpenParen, scanner.Star, scanner.CloseParen); ok {
-		return &ast.OpExpr{ast.CountAll}
+		return &ast.OpExpr{ast.CountAll}, nil
 	}
-	if expr, _ := p.listComprehensionExpr(); expr != nil {
-		return expr
+	if expr, err := p.listComprehensionExpr(); err != nil {
+		return nil, err
+	} else if expr != nil {
+		return expr, nil
 	}
-	if expr, _ := p.patternComprehensionExpr(); expr != nil {
-		return expr
+	if expr, err := p.patternComprehensionExpr(); err != nil {
+		return nil, err
+	} else if expr != nil {
+		return expr, nil
 	}
-	if expr, _ := p.builtInFunction(); expr != nil {
-		return expr
+	if expr, err := p.builtInFunction(); err != nil {
+		return nil, err
+	} else if expr != nil {
+		return expr, nil
 	}
-	if expr, _ := p.relationshipsPattern(); expr != nil {
-		return expr
+	if expr, err := p.relationshipsPattern(); err != nil {
+		return nil, err
+	} else if expr != nil {
+		return expr, nil
 	}
-	if expr, _ := p.parenthesizedExpr(); expr != nil {
-		return expr
+	if expr, err := p.parenthesizedExpr(); err != nil {
+		return nil, err
+	} else if expr != nil {
+		return expr, nil
 	}
-	if expr, _ := p.variable(); expr != nil {
-		return expr
+	if expr, err := p.variable(); err != nil {
+		return nil, err
+	} else if expr != nil {
+		return expr, nil
 	}
-	return nil
+	return nil, p.reporter.Error(p.scanner.Line(), "expecting atom")
 }
 
 func (p *Parser) literal() ast.Expr {
@@ -380,24 +473,41 @@ func (p *Parser) parameter() (ast.Expr, error) {
 }
 
 func (p *Parser) caseExpr() (ast.Expr, error) {
-	caseExpr := &ast.CaseExpr{}
 	if t, ok := p.match(scanner.Case); ok {
-		caseExpr.Init = p.expr()
-		caseAlt, err := p.caseAlt()
-		for err == nil && caseAlt != nil {
-			caseExpr.Alternatives = append(caseExpr.Alternatives, caseAlt)
+		initExpr, err := p.expr()
+		if err != nil {
+			return nil, err
 		}
-		if len(caseExpr.Alternatives) == 0 {
+		caseAlts := []*ast.CaseAltNode{}
+		caseAlt, err := p.caseAlt()
+		if err != nil {
+			return nil, err
+		}
+		if caseAlt == nil {
+			return nil, p.reporter.Error(p.scanner.Line(), "expecting case alternative")
+		}
+		for caseAlt != nil {
+			caseAlts = append(caseAlts, caseAlt)
+			caseAlt, err = p.caseAlt()
+			if err != nil {
+				return nil, err
+			}
+		}
+		if len(caseAlts) == 0 {
 			return nil, p.reporter.Error(t.Line, "expecting WHEN after CASE or CASE initialization expression")
 		}
+		var elseExpr ast.Expr
 		if t, ok := p.match(scanner.Else); ok {
-			caseExpr.Else = p.expr()
-			if caseExpr.Else == nil {
+			elseExpr, err = p.expr()
+			if err != nil {
+				return nil, err
+			}
+			if elseExpr == nil {
 				return nil, p.reporter.Error(t.Line, "expecting expression after CASE ELSE")
 			}
 		}
 		if t, ok := p.match(scanner.End); ok {
-			return caseExpr, nil
+			return &ast.CaseExpr{Init: initExpr, Alternatives: caseAlts, Else: elseExpr}, nil
 		} else {
 			return nil, p.reporter.Error(t.Line, "expecting CASE END")
 		}
@@ -407,9 +517,15 @@ func (p *Parser) caseExpr() (ast.Expr, error) {
 
 func (p *Parser) caseAlt() (*ast.CaseAltNode, error) {
 	if _, ok := p.match(scanner.When); ok {
-		whenExpr := p.expr()
+		whenExpr, err := p.expr()
+		if err != nil {
+			return nil, err
+		}
 		if t, ok := p.match(scanner.Then); ok {
-			thenExpr := p.expr()
+			thenExpr, err := p.expr()
+			if err != nil {
+				return nil, err
+			}
 			return &ast.CaseAltNode{whenExpr, thenExpr}, nil
 		} else {
 			return nil, p.reporter.Error(t.Line, "expecting symbolic name or integer")
@@ -431,7 +547,10 @@ func (p *Parser) listComprehensionExpr() (ast.Expr, error) {
 	if t, ok := p.match(scanner.Pipe); !ok {
 		return nil, p.reporter.Error(t.Line, "expecting '|' in list expression")
 	}
-	listCompExpr.Expr = p.expr()
+	listCompExpr.Expr, err = p.expr()
+	if err != nil {
+		return nil, err
+	}
 	if listCompExpr.Expr == nil {
 		return nil, p.reporter.Error(p.scanner.Line(), "expecting expression after '|'")
 	}
@@ -454,11 +573,19 @@ func (p *Parser) filterExpr() (ast.Expr, error) {
 	if t, ok := p.match(scanner.In); !ok {
 		return nil, p.reporter.Error(t.Line, "expecting 'IN'")
 	}
-	if filterExpr.InExpr = p.expr(); filterExpr.InExpr == nil {
+	filterExpr.InExpr, err = p.expr()
+	if err != nil {
+		return nil, err
+	}
+	if filterExpr.InExpr == nil {
 		return nil, p.reporter.Error(p.scanner.Line(), "expecting 'IN' expression")
 	}
 	if _, ok := p.match(scanner.Where); ok {
-		if filterExpr.WhereExpr = p.expr(); filterExpr.WhereExpr == nil {
+		filterExpr.WhereExpr, err = p.expr()
+		if err != nil {
+			return nil, err
+		}
+		if filterExpr.WhereExpr == nil {
 			return nil, p.reporter.Error(p.scanner.Line(), "expecting 'WHERE' expression")
 		}
 	}
@@ -543,16 +670,22 @@ func (p *Parser) patternComprehensionExpr() (ast.Expr, error) {
 		return nil, p.reporter.Error(p.scanner.Line(), "expecting relationship pattern")
 	}
 	if _, ok := p.match(scanner.Where); ok {
-		patternExpr.WhereExpr = p.expr()
-		if p.expr() == nil {
+		patternExpr.WhereExpr, err = p.expr()
+		if err != nil {
+			return nil, err
+		}
+		if patternExpr.WhereExpr == nil {
 			return nil, p.reporter.Error(p.scanner.Line(), "expecting expression following 'WHERE'")
 		}
 	}
 	if t, ok := p.match(scanner.Pipe); !ok {
 		return nil, p.reporter.Error(t.Line, "expecting '|'")
 	}
-	patternExpr.PipeExpr = p.expr()
-	if p.expr() == nil {
+	patternExpr.PipeExpr, err = p.expr()
+	if err != nil {
+		return nil, err
+	}
+	if patternExpr.PipeExpr == nil {
 		return nil, p.reporter.Error(p.scanner.Line(), "expecting expression following '|'")
 	}
 	if t, ok := p.match(scanner.CloseBracket); !ok {
@@ -783,7 +916,11 @@ func (p *Parser) mapLiteral() (*ast.MapLiteral, error) {
 		if t, ok := p.match(scanner.Colon); !ok {
 			return nil, p.reporter.Error(t.Line, "expecting '}' following map literal")
 		}
-		if pkn.Expr = p.expr(); pkn.Expr == nil {
+		pkn.Expr, err = p.expr()
+		if err != nil {
+			return nil, err
+		}
+		if pkn.Expr == nil {
 			return nil, p.reporter.Error(p.scanner.Line(), "expecting expression following ':'")
 		}
 		literal.PropertyKeyNames = append(literal.PropertyKeyNames, pkn)
@@ -798,7 +935,10 @@ func (p *Parser) parenthesizedExpr() (ast.Expr, error) {
 	if _, ok := p.match(scanner.OpenParen); !ok {
 		return nil, nil
 	}
-	expr := p.expr()
+	expr, err := p.expr()
+	if err != nil {
+		return nil, err
+	}
 	if t, ok := p.match(scanner.CloseParen); !ok {
 		return nil, p.reporter.Error(t.Line, "expecting ')' following expression")
 	}
@@ -818,14 +958,20 @@ func (p *Parser) functionInvocation() (ast.Expr, error) {
 		return nil, p.reporter.Error(t.Line, "expecting ')' function parameters")
 	}
 	args := []ast.Expr{}
-	expr := p.expr()
+	expr, err := p.expr()
+	if err != nil {
+		return nil, err
+	}
 	if expr != nil {
 		args = append(args, expr)
 		for {
 			if _, ok := p.match(scanner.Comma); !ok {
 				break
 			}
-			expr = p.expr()
+			expr, err := p.expr()
+			if err != nil {
+				return nil, err
+			}
 			if expr == nil {
 				return nil, p.reporter.Error(p.scanner.Line(), "expecting argument following ','")
 			}
