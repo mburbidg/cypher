@@ -115,6 +115,8 @@ func (s *Scanner) NextToken() Token {
 			return s.scanNumber('.')
 		}
 		return newOperatorToken(Period, s.line)
+	case ch == ',':
+		return newOperatorToken(Comma, s.line)
 	case ch == '(':
 		return newOperatorToken(OpenParen, s.line)
 	case ch == ')':

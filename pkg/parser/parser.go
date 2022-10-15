@@ -328,6 +328,18 @@ func (p *Parser) atom() ast.Expr {
 	if expr, _ := p.patternComprehensionExpr(); expr != nil {
 		return expr
 	}
+	if expr, _ := p.builtInFunction(); expr != nil {
+		return expr
+	}
+	if expr, _ := p.relationshipsPattern(); expr != nil {
+		return expr
+	}
+	if expr, _ := p.parenthesizedExpr(); expr != nil {
+		return expr
+	}
+	if expr, _ := p.variable(); expr != nil {
+		return expr
+	}
 	return nil
 }
 
@@ -484,10 +496,6 @@ func (p *Parser) builtInFunction() (ast.Expr, error) {
 	return nil, nil
 }
 
-func (p *Parser) functionInvocation() ast.Expr {
-	return nil
-}
-
 func (p *Parser) variable() (ast.Expr, error) {
 	s, err := p.symbolicName()
 	if err != nil {
@@ -530,7 +538,7 @@ func (p *Parser) patternComprehensionExpr() (ast.Expr, error) {
 			return nil, p.reporter.Error(t.Line, "expecting '=' following variable")
 		}
 	}
-	patternExpr.ReltionshipsPattern, err = p.mustRelationshipsPattern()
+	patternExpr.ReltionshipsPattern, err = p.relationshipsPattern()
 	if patternExpr.ReltionshipsPattern == nil {
 		return nil, p.reporter.Error(p.scanner.Line(), "expecting relationship pattern")
 	}
@@ -553,7 +561,7 @@ func (p *Parser) patternComprehensionExpr() (ast.Expr, error) {
 	return nil, nil
 }
 
-func (p *Parser) mustRelationshipsPattern() (*ast.RelationshipsPattern, error) {
+func (p *Parser) relationshipsPattern() (*ast.RelationshipsPattern, error) {
 	var err error
 	rel := &ast.RelationshipsPattern{
 		Chain: []*ast.PatternElementChain{},
@@ -563,7 +571,7 @@ func (p *Parser) mustRelationshipsPattern() (*ast.RelationshipsPattern, error) {
 		return nil, err
 	}
 	if rel.Left == nil {
-		return nil, p.reporter.Error(p.scanner.Line(), "expecting node pattern")
+		return nil, nil
 	}
 	chain, err := p.patternElementChain()
 	if err != nil {
@@ -784,4 +792,83 @@ func (p *Parser) mapLiteral() (*ast.MapLiteral, error) {
 		return nil, p.reporter.Error(t.Line, "expecting '}' following map literal")
 	}
 	return literal, nil
+}
+
+func (p *Parser) parenthesizedExpr() (ast.Expr, error) {
+	if _, ok := p.match(scanner.OpenParen); !ok {
+		return nil, nil
+	}
+	expr := p.expr()
+	if t, ok := p.match(scanner.CloseParen); !ok {
+		return nil, p.reporter.Error(t.Line, "expecting ')' following expression")
+	}
+	return expr, nil
+}
+
+func (p *Parser) functionInvocation() (ast.Expr, error) {
+	fn, err := p.functionName()
+	if err != nil {
+		return nil, err
+	}
+	if t, ok := p.match(scanner.OpenParen); !ok {
+		return nil, p.reporter.Error(t.Line, "expecting '(' function name")
+	}
+	_, distinct := p.match(scanner.Distinct)
+	if t, ok := p.match(scanner.CloseParen); !ok {
+		return nil, p.reporter.Error(t.Line, "expecting ')' function parameters")
+	}
+	args := []ast.Expr{}
+	expr := p.expr()
+	if expr != nil {
+		args = append(args, expr)
+		for {
+			if _, ok := p.match(scanner.Comma); !ok {
+				break
+			}
+			expr = p.expr()
+			if expr == nil {
+				return nil, p.reporter.Error(p.scanner.Line(), "expecting argument following ','")
+			}
+		}
+	}
+	return &ast.FunctionInvocation{FunctionName: fn, Distinct: distinct, Args: args}, nil
+}
+
+func (p *Parser) functionName() (ast.FunctionName, error) {
+	if _, ok := p.match(scanner.Exists); ok {
+		return &ast.ExistsFunctionName{}, nil
+	}
+	ns, err := p.namespace()
+	if err != nil {
+		return nil, err
+	}
+	name, err := p.symbolicName()
+	if err != nil {
+		return nil, err
+	}
+	if name == nil {
+		if len(ns) == 0 {
+			return nil, nil
+		}
+		return nil, p.reporter.Error(p.scanner.Line(), "expecting function name")
+	}
+	return &ast.SymbolicFunctionName{Namespace: ns, FunctionName: name}, nil
+}
+
+func (p *Parser) namespace() ([]ast.SymbolicName, error) {
+	namespace := []ast.SymbolicName{}
+	for {
+		sn, err := p.symbolicName()
+		if err != nil {
+			return nil, err
+		}
+		if sn == nil {
+			break
+		}
+		namespace = append(namespace, sn)
+		if t, ok := p.match(scanner.Period); !ok {
+			return nil, p.reporter.Error(t.Line, "expecting '.' after namespace identifier")
+		}
+	}
+	return namespace, nil
 }

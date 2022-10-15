@@ -117,7 +117,7 @@ type VariableExpr struct {
 
 type PatternComprehensionExpr struct {
 	Variable            Expr
-	ReltionshipsPattern *RelationshipsPattern
+	ReltionshipsPattern Expr
 	WhereExpr           Expr
 	PipeExpr            Expr
 }
@@ -170,6 +170,23 @@ type RangeLiteral struct {
 	End   int64
 }
 
+type FunctionInvocation struct {
+	FunctionName FunctionName
+	Distinct     bool
+	Args         []Expr
+}
+
+type FunctionName interface {
+	functionNameNode()
+}
+
+type SymbolicFunctionName struct {
+	Namespace    []SymbolicName
+	FunctionName SymbolicName
+}
+
+type ExistsFunctionName struct{}
+
 func (e *OpExpr) exprNode()                   {}
 func (e *UnaryExpr) exprNode()                {}
 func (e *BinaryExpr) exprNode()               {}
@@ -184,9 +201,14 @@ func (e *FilterExpr) exprNode()               {}
 func (e *BuiltInExpr) exprNode()              {}
 func (e *VariableExpr) exprNode()             {}
 func (e *PatternComprehensionExpr) exprNode() {}
+func (e *RelationshipsPattern) exprNode()     {}
+func (e *FunctionInvocation) exprNode()       {}
 
 func (s *SymbolicNameIdentifier) symbolicNameNode() {}
 func (s *SymbolicNameHexLetter) symbolicNameNode()  {}
 
 func (r *SymbolicNameSchemaName) schemaNameNode() {}
 func (r *ReservedWordSchemaName) schemaNameNode() {}
+
+func (fn *SymbolicFunctionName) functionNameNode() {}
+func (fn *ExistsFunctionName) functionNameNode()   {}

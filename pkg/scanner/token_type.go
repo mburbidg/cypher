@@ -10,6 +10,7 @@ const (
 
 	// Punctuation
 	Period
+	Comma
 	Dotdot
 	OpenParen
 	CloseParen
