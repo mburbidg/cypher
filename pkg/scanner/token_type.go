@@ -6,9 +6,12 @@ const (
 	// Special tokens
 	Illegal TokenType = iota
 	EndOfInput
+	None
 
 	// Punctuation
 	Period
+	Comma
+	Dotdot
 	OpenParen
 	CloseParen
 	OpenBrace
@@ -29,52 +32,43 @@ const (
 	GreaterThanOrEqual
 	DollarSign
 	Colon
+	Pipe
+	Dash
 
 	Identifier
 	Double
 	Integer
+	DecimalInteger
+	HexInteger
+	OctInteger
 	String
 
 	// Reserved words
 
-	// Clauses
-	Create
-	Delete
-	Detach
-	Exists
-	Match
-	Merge
-	Optional
-	Remove
-	Return
-	Set
-	Union
-	Unwind
-	With
-
-	// Subclauses
-	Limit
-	Order
-	Skip
-	Where
-
-	// Modifiers
+	All
 	Asc
 	Ascending
 	By
+	Create
+	Delete
 	Desc
 	Descending
+	Detach
+	Exists
+	Limit
+	Match
+	Merge
 	On
-
-	// Expressions
-	All
-	Case
-	Else
-	End
-	Then
-	When
-
-	// Operators
+	Optional
+	Order
+	Remove
+	Return
+	Set
+	Skip
+	Where
+	With
+	Union
+	Unwind
 	And
 	As
 	Contains
@@ -86,9 +80,22 @@ const (
 	Or
 	Starts
 	Xor
-
-	// Literals
 	False
-	Null
 	True
+	Null
+	Constraint
+	Do
+	For
+	Require
+	Unique
+	Case
+	When
+	Then
+	Else
+	End
+	Mandatory
+	Scalar
+	Of
+	Add
+	Drop
 )

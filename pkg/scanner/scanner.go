@@ -16,6 +16,7 @@ type Scanner struct {
 	reporter utils.Reporter
 	line     int
 	eof      bool
+	tokens   []Token
 }
 
 const (
@@ -28,6 +29,7 @@ func New(input io.Reader, reporter utils.Reporter) *Scanner {
 		reporter: reporter,
 		line:     1,
 		eof:      false,
+		tokens:   make([]Token, 0, 10),
 	}
 }
 
@@ -66,7 +68,31 @@ func (s *Scanner) prev() {
 	}
 }
 
+func (s *Scanner) pushToken(token Token) {
+	s.tokens = append(s.tokens, token)
+}
+
+func (s *Scanner) popToken() (Token, bool) {
+	if len(s.tokens) > 0 {
+		token := s.tokens[len(s.tokens)-1]
+		s.tokens = s.tokens[:len(s.tokens)-1]
+		return token, true
+	}
+	return Token{}, false
+}
+
+func (s *Scanner) Line() int {
+	return s.line
+}
+
+func (s *Scanner) ReturnToken(token Token) {
+	s.pushToken(token)
+}
+
 func (s *Scanner) NextToken() Token {
+	if t, ok := s.popToken(); ok {
+		return t
+	}
 	if s.eof == true {
 		return endOfInputToken
 	}
@@ -81,11 +107,16 @@ func (s *Scanner) NextToken() Token {
 		if ch == eof {
 			return endOfInputToken
 		}
+		if ch == '.' {
+			return newOperatorToken(Dotdot, s.line)
+		}
 		s.prev()
 		if unicode.IsDigit(ch) {
 			return s.scanNumber('.')
 		}
 		return newOperatorToken(Period, s.line)
+	case ch == ',':
+		return newOperatorToken(Comma, s.line)
 	case ch == '(':
 		return newOperatorToken(OpenParen, s.line)
 	case ch == ')':
@@ -145,6 +176,10 @@ func (s *Scanner) NextToken() Token {
 		return newOperatorToken(DollarSign, s.line)
 	case ch == ':':
 		return newOperatorToken(Colon, s.line)
+	case ch == '|':
+		return newOperatorToken(Pipe, s.line)
+	case ch == '-':
+		return newOperatorToken(Dash, s.line)
 	case unicode.IsDigit(ch):
 		return s.scanNumber(ch)
 	case ch == '"', ch == '\'':
@@ -240,7 +275,7 @@ func (s *Scanner) scanNumber(ch rune) Token {
 			return s.scanDouble(&b)
 		default:
 			s.prev()
-			return newIntegerToken("0", 10, s.line)
+			return newIntegerToken(DecimalInteger, "0", 10, s.line)
 		}
 	case '.':
 		return s.scanDouble(&b)
@@ -249,7 +284,7 @@ func (s *Scanner) scanNumber(ch rune) Token {
 		ch := s.next()
 		if ch == eof {
 			s.prev()
-			return newIntegerToken(b.String(), 10, s.line)
+			return newIntegerToken(DecimalInteger, b.String(), 10, s.line)
 		}
 		switch ch {
 		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
@@ -262,7 +297,7 @@ func (s *Scanner) scanNumber(ch rune) Token {
 			return s.scanExponent(&b)
 		default:
 			s.prev()
-			return newIntegerToken(b.String(), 10, s.line)
+			return newIntegerToken(DecimalInteger, b.String(), 10, s.line)
 		}
 	}
 }
@@ -303,7 +338,7 @@ func (s *Scanner) scanHexInteger(b *strings.Builder) Token {
 				s.reporter.Error(s.line, "expecting hex digit following 'x'")
 				return newIllegalToken(b.String())
 			}
-			return newIntegerToken(b.String(), 0, s.line)
+			return newIntegerToken(HexInteger, b.String(), 0, s.line)
 		}
 	}
 }
@@ -315,7 +350,7 @@ func (s *Scanner) scanOctInteger(b *strings.Builder) Token {
 			b.WriteRune(ch)
 		default:
 			s.prev()
-			return newIntegerToken(b.String(), 0, s.line)
+			return newIntegerToken(OctInteger, b.String(), 0, s.line)
 		}
 	}
 }
