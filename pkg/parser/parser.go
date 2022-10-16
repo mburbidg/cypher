@@ -5,7 +5,6 @@ import (
 	"github.com/mburbidg/cypher/pkg/scanner"
 	"github.com/mburbidg/cypher/pkg/utils"
 	"math"
-	"unicode/utf8"
 )
 
 type Parser struct {
@@ -138,26 +137,24 @@ func (p *Parser) comparisonExpr() (ast.Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		expr = &ast.BinaryExpr{expr, ast.Operator(t.T), right}
+		op, _ := opForTokens[t.T]
+		expr = &ast.BinaryExpr{expr, op, right}
 	}
 	return expr, nil
 }
 
 func (p *Parser) addOrSubtractExpr() (ast.Expr, error) {
-	tokenTypes := []scanner.TokenType{
-		scanner.Plus,
-		scanner.Minus,
-	}
 	expr, err := p.multiplyDivideModuloExpr()
 	if err != nil {
 		return nil, err
 	}
-	for t, ok := p.match(tokenTypes...); ok; _, ok = p.match(tokenTypes...) {
+	for t, ok := p.match(scanner.Plus, scanner.Minus); ok; _, ok = p.match(scanner.Plus, scanner.Minus) {
 		right, err := p.multiplyDivideModuloExpr()
 		if err != nil {
 			return nil, err
 		}
-		expr = &ast.BinaryExpr{expr, ast.Operator(t.T), right}
+		op, _ := opForTokens[t.T]
+		expr = &ast.BinaryExpr{expr, op, right}
 	}
 	return expr, nil
 }
@@ -172,12 +169,13 @@ func (p *Parser) multiplyDivideModuloExpr() (ast.Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	for t, ok := p.match(tokenTypes...); ok; _, ok = p.match(tokenTypes...) {
+	for t, ok := p.match(tokenTypes...); ok; t, ok = p.match(tokenTypes...) {
 		right, err := p.powerExpr()
 		if err != nil {
 			return nil, err
 		}
-		expr = &ast.BinaryExpr{expr, ast.Operator(t.T), right}
+		op, _ := opForTokens[t.T]
+		expr = &ast.BinaryExpr{expr, op, right}
 	}
 	return expr, nil
 }
@@ -260,13 +258,22 @@ func (p *Parser) propertyOrLabelsExpr() (ast.Expr, error) {
 			properties = append(properties, property)
 		}
 	}
+	if len(properties) == 0 {
+		properties = nil
+	}
 	labels, _ := p.NodeLabels()
 	return &ast.PropertyLabelsExpr{atom, properties, labels}, nil
 }
 
 func (p *Parser) propertyLookup() (ast.SchemaName, error) {
-	if s, err := p.schemaName(); err == nil {
-		return s, nil
+	if _, ok := p.match(scanner.Period); ok {
+		sn, err := p.schemaName()
+		if err != nil {
+			return nil, err
+		}
+		if sn != nil {
+			return sn, nil
+		}
 	}
 	return nil, nil
 }
@@ -639,13 +646,7 @@ func (p *Parser) symbolicName() (ast.SymbolicName, error) {
 		if symbolType, ok := ast.SymbolNames[t.Lexeme]; ok {
 			return &ast.SymbolicNameIdentifier{t, symbolType}, nil
 		}
-		if len(t.Lexeme) == 1 {
-			switch ch, _ := utf8.DecodeLastRuneInString(t.Lexeme); ch {
-			case 'a', 'b', 'c', 'd', 'e', 'f':
-				return &ast.SymbolicNameHexLetter{ch}, nil
-			}
-			return &ast.SymbolicNameIdentifier{t, ast.Identifier}, nil
-		}
+		return &ast.SymbolicNameIdentifier{t, ast.Identifier}, nil
 	}
 	return nil, nil
 }

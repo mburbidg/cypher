@@ -48,3 +48,12 @@ func TestAdditionExpr(t *testing.T) {
 	assert.NoError(t, err)
 	log.Printf("ast=%v\n", ast)
 }
+
+func TestMathExpr(t *testing.T) {
+	reporter := newTestReporter()
+	s := scanner.New(bytes.NewBufferString("12 / 4 * (3 - 2 * 4)"), reporter)
+	p := New(s, reporter)
+	ast, err := p.Parse()
+	assert.NoError(t, err)
+	log.Printf("ast=%v\n", ast)
+}
