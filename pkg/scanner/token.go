@@ -1,7 +1,6 @@
 package scanner
 
 import (
-	"log"
 	"strconv"
 )
 
@@ -38,8 +37,7 @@ func newEndOfInputToken() Token {
 }
 
 func newIntegerToken(t TokenType, lexeme string, base int, line int) Token {
-	n, err := strconv.ParseInt(lexeme, base, 64)
-	log.Printf("err=%s\n", err)
+	n, _ := strconv.ParseInt(lexeme, base, 64)
 	return Token{
 		T:       t,
 		Lexeme:  lexeme,
