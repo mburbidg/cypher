@@ -24,6 +24,7 @@ func (p *Parser) Parse() (ast.Expr, error) {
 }
 
 func (p *Parser) match(tokenTypes ...scanner.TokenType) (scanner.Token, bool) {
+	pos := p.scanner.Position
 	token := p.scanner.NextToken()
 	for _, tokenType := range tokenTypes {
 		switch token.T {
@@ -33,21 +34,22 @@ func (p *Parser) match(tokenTypes ...scanner.TokenType) (scanner.Token, bool) {
 			return token, true
 		}
 	}
-	p.scanner.ReturnToken(token)
+	p.scanner.Position = pos
 	return scanner.Token{}, false
 }
 
 func (p *Parser) matchPhrase(tokenTypes ...scanner.TokenType) bool {
+	pos := p.scanner.Position
 	if len(tokenTypes) > 0 {
 		if t := p.scanner.NextToken(); t.T == tokenTypes[0] {
 			if ok := p.matchPhrase(tokenTypes[1:]...); ok {
 				return true
 			} else {
-				p.scanner.ReturnToken(t)
+				p.scanner.Position = pos
 				return false
 			}
 		} else {
-			p.scanner.ReturnToken(t)
+			p.scanner.Position = pos
 			return false
 		}
 	} else {
@@ -279,11 +281,12 @@ func (p *Parser) propertyLookup() (ast.SchemaName, error) {
 }
 
 func (p *Parser) schemaName() (ast.SchemaName, error) {
+	pos := p.scanner.Position
 	t := p.scanner.NextToken()
 	if _, ok := scanner.ReservedWordTokens[t.T]; ok {
 		return &ast.ReservedWordSchemaName{t.T}, nil
 	}
-	p.scanner.ReturnToken(t)
+	p.scanner.Position = pos
 	name, err := p.symbolicName()
 	if err != nil {
 		return nil, err
@@ -607,6 +610,7 @@ var builtInNames = map[string]ast.Operator{
 }
 
 func (p *Parser) builtInFunction() (ast.Expr, error) {
+	pos := p.scanner.Position
 	if t, ok := p.match(scanner.Identifier); ok {
 		if op, ok := builtInNames[t.Lexeme]; ok {
 			if _, ok := p.match(scanner.OpenParen); !ok {
@@ -624,7 +628,7 @@ func (p *Parser) builtInFunction() (ast.Expr, error) {
 			}
 			return &ast.BuiltInExpr{op, expr}, nil
 		} else {
-			p.scanner.ReturnToken(t)
+			p.scanner.Position = pos
 		}
 	}
 	return nil, nil
@@ -751,12 +755,13 @@ func (p *Parser) patternElementChain() (*ast.PatternElementChain, error) {
 func (p *Parser) relationshipPattern() (*ast.RelationshipPattern, error) {
 	var err error
 	pattern := &ast.RelationshipPattern{Left: ast.Undirected, Right: ast.Undirected}
-	t, ok := p.match(scanner.LessThan)
+	pos := p.scanner.Position
+	_, ok := p.match(scanner.LessThan)
 	if ok {
 		pattern.Left = ast.Directed
 	}
 	if _, ok := p.match(scanner.Dash); !ok {
-		p.scanner.ReturnToken(t)
+		p.scanner.Position = pos
 		return nil, nil
 	}
 	pattern.RelationshipDetail, err = p.relationshipDetail()
