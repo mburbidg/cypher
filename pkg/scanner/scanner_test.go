@@ -1,7 +1,6 @@
 package scanner
 
 import (
-	"bytes"
 	"github.com/mburbidg/cypher/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -79,7 +78,7 @@ func TestNumbers(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			s := New(bytes.NewBufferString(tc.src), newTestReporter())
+			s := New([]byte(tc.src), newTestReporter())
 			assertTokens(t, tc.tokens, s)
 		})
 	}
@@ -102,7 +101,7 @@ func TestNumberValues(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			s := New(bytes.NewBufferString(tc.src), newTestReporter())
+			s := New([]byte(tc.src), newTestReporter())
 			assertLiteral(t, tc.literals, s)
 		})
 	}
@@ -110,10 +109,10 @@ func TestNumberValues(t *testing.T) {
 
 func TestString(t *testing.T) {
 	reporter := newTestReporter()
-	s := New(bytes.NewBufferString("\"This is a \\u00fa \\U032bca08 string.\\n\""), reporter)
+	s := New([]byte("\"This is a \\u00fa \\U032bca08 string.\\n\""), reporter)
 	assertTokens(t, []TokenType{String, EndOfInput}, s)
 	assert.Equal(t, 0, len(reporter.errors))
-	s = New(bytes.NewBufferString("'This is a \\u00fa \\U032bca08 string.\\n'"), reporter)
+	s = New([]byte("'This is a \\u00fa \\U032bca08 string.\\n'"), reporter)
 	assertTokens(t, []TokenType{String, EndOfInput}, s)
 	assert.Equal(t, 0, len(reporter.errors))
 }
@@ -139,11 +138,12 @@ func TestPunctuation(t *testing.T) {
 		"greaterthan/ws":       {"a > b", []TokenType{Identifier, GreaterThan, Identifier, EndOfInput}},
 		"greaterthanorequal":   {"a>=b", []TokenType{Identifier, GreaterThanOrEqual, Identifier, EndOfInput}},
 		"greaterhanorequal/ws": {"a >= b", []TokenType{Identifier, GreaterThanOrEqual, Identifier, EndOfInput}},
+		"illegal character":    {"a—b", []TokenType{Identifier, GreaterThanOrEqual, Identifier, EndOfInput}},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			s := New(bytes.NewBufferString(tc.src), newTestReporter())
+			s := New([]byte(tc.src), newTestReporter())
 			assertTokens(t, tc.tokens, s)
 		})
 	}
@@ -203,7 +203,7 @@ func TestKeywords(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			s := New(bytes.NewBufferString(tc.src), newTestReporter())
+			s := New([]byte(tc.src), newTestReporter())
 			assertTokens(t, tc.tokens, s)
 		})
 	}
@@ -219,7 +219,7 @@ func TestStatement(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			s := New(bytes.NewBufferString(tc.src), newTestReporter())
+			s := New([]byte(tc.src), newTestReporter())
 			assertTokens(t, tc.tokens, s)
 		})
 	}

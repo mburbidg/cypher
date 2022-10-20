@@ -1,99 +1,74 @@
 package scanner
 
 import (
-	"bufio"
 	"fmt"
 	"github.com/mburbidg/cypher/pkg/utils"
 	"github.com/smasher164/xid"
-	"io"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 )
 
+type Position struct {
+	offset     int
+	prevOffset int
+	line       int
+	eofRead    bool
+}
+
 type Scanner struct {
-	input    *bufio.Reader
+	src      []byte
+	Position Position
 	reporter utils.Reporter
-	line     int
-	eof      bool
-	tokens   []Token
 }
 
 const (
 	eof = -1
 )
 
-func New(input io.Reader, reporter utils.Reporter) *Scanner {
+func New(src []byte, reporter utils.Reporter) *Scanner {
 	return &Scanner{
-		input:    bufio.NewReader(input),
+		src:      src,
+		Position: Position{offset: 0, prevOffset: 0, line: 1, eofRead: false},
 		reporter: reporter,
-		line:     1,
-		eof:      false,
-		tokens:   make([]Token, 0, 10),
 	}
 }
 
 func (s *Scanner) next() rune {
-	if s.eof {
-		return eof
-	}
-	ch, _, err := s.input.ReadRune()
-	if err != nil {
-		if err != io.EOF {
-			s.reporter.Error(s.line, fmt.Sprintf("error reading input: err=%s\n", err))
+	if s.Position.offset < len(s.src) {
+		r, w := utf8.DecodeRune(s.src[s.Position.offset:])
+		s.Position.prevOffset = s.Position.offset
+		s.Position.offset += w
+		if r == '\n' {
+			s.Position.line += 1
 		}
-		s.eof = true
-		return eof
+		return r
 	}
-	return ch
+	s.Position.eofRead = true
+	return eof
 }
 
 func (s *Scanner) peek() rune {
-	ch := s.next()
-	if !s.eof {
-		err := s.input.UnreadRune()
-		if err != nil {
-			s.reporter.Error(s.line, fmt.Sprintf("error un-reading input: err=%s\n", err))
-		}
+	if s.Position.offset < len(s.src) {
+		r, _ := utf8.DecodeRune(s.src[s.Position.offset:])
+		return r
 	}
-	return ch
+	return eof
 }
 
 func (s *Scanner) prev() {
-	if !s.eof {
-		err := s.input.UnreadRune()
-		if err != nil {
-			s.reporter.Error(s.line, fmt.Sprintf("error un-reading input: err=%s\n", err))
-		}
+	// Once we hit eof, no backing up.
+	if !s.Position.eofRead {
+		s.Position.offset = s.Position.prevOffset
 	}
-}
-
-func (s *Scanner) pushToken(token Token) {
-	s.tokens = append(s.tokens, token)
-}
-
-func (s *Scanner) popToken() (Token, bool) {
-	if len(s.tokens) > 0 {
-		token := s.tokens[len(s.tokens)-1]
-		s.tokens = s.tokens[:len(s.tokens)-1]
-		return token, true
-	}
-	return Token{}, false
 }
 
 func (s *Scanner) Line() int {
-	return s.line
-}
-
-func (s *Scanner) ReturnToken(token Token) {
-	s.pushToken(token)
+	return s.Position.line
 }
 
 func (s *Scanner) NextToken() Token {
-	if t, ok := s.popToken(); ok {
-		return t
-	}
-	if s.eof == true {
+	if s.Position.offset >= len(s.src) {
 		return endOfInputToken
 	}
 	ch := s.next()
@@ -108,33 +83,33 @@ func (s *Scanner) NextToken() Token {
 			return endOfInputToken
 		}
 		if ch == '.' {
-			return newOperatorToken(Dotdot, s.line)
+			return newOperatorToken(Dotdot, s.Position.line)
 		}
 		s.prev()
 		if unicode.IsDigit(ch) {
 			return s.scanNumber('.')
 		}
-		return newOperatorToken(Period, s.line)
+		return newOperatorToken(Period, s.Position.line)
 	case ch == ',':
-		return newOperatorToken(Comma, s.line)
+		return newOperatorToken(Comma, s.Position.line)
 	case ch == '(':
-		return newOperatorToken(OpenParen, s.line)
+		return newOperatorToken(OpenParen, s.Position.line)
 	case ch == ')':
-		return newOperatorToken(CloseParen, s.line)
+		return newOperatorToken(CloseParen, s.Position.line)
 	case ch == '{':
-		return newOperatorToken(OpenBrace, s.line)
+		return newOperatorToken(OpenBrace, s.Position.line)
 	case ch == '}':
-		return newOperatorToken(CloseBrace, s.line)
+		return newOperatorToken(CloseBrace, s.Position.line)
 	case ch == '[':
-		return newOperatorToken(OpenBracket, s.line)
+		return newOperatorToken(OpenBracket, s.Position.line)
 	case ch == ']':
-		return newOperatorToken(CloseBracket, s.line)
+		return newOperatorToken(CloseBracket, s.Position.line)
 	case ch == '+':
-		return newOperatorToken(Plus, s.line)
+		return newOperatorToken(Plus, s.Position.line)
 	case ch == '-':
-		return newOperatorToken(Minus, s.line)
+		return newOperatorToken(Minus, s.Position.line)
 	case ch == '*':
-		return newOperatorToken(Star, s.line)
+		return newOperatorToken(Star, s.Position.line)
 	case ch == '/':
 		ch = s.next()
 		switch ch {
@@ -146,40 +121,40 @@ func (s *Scanner) NextToken() Token {
 			return s.NextToken()
 		default:
 			s.prev()
-			return newOperatorToken(ForwardSlash, s.line)
+			return newOperatorToken(ForwardSlash, s.Position.line)
 		}
 	case ch == '%':
-		return newOperatorToken(Percent, s.line)
+		return newOperatorToken(Percent, s.Position.line)
 	case ch == '^':
-		return newOperatorToken(Caret, s.line)
+		return newOperatorToken(Caret, s.Position.line)
 	case ch == '=':
-		return newOperatorToken(Equal, s.line)
+		return newOperatorToken(Equal, s.Position.line)
 	case ch == '<':
 		ch := s.next()
 		switch ch {
 		case '>':
-			return newOperatorToken(NotEqual, s.line)
+			return newOperatorToken(NotEqual, s.Position.line)
 		case '=':
-			return newOperatorToken(LessThanOrEqual, s.line)
+			return newOperatorToken(LessThanOrEqual, s.Position.line)
 		default:
 			s.prev()
-			return newOperatorToken(LessThan, s.line)
+			return newOperatorToken(LessThan, s.Position.line)
 		}
 	case ch == '>':
 		ch := s.next()
 		if ch == '=' {
-			return newOperatorToken(GreaterThanOrEqual, s.line)
+			return newOperatorToken(GreaterThanOrEqual, s.Position.line)
 		}
 		s.prev()
-		return newOperatorToken(GreaterThan, s.line)
+		return newOperatorToken(GreaterThan, s.Position.line)
 	case ch == '$':
-		return newOperatorToken(DollarSign, s.line)
+		return newOperatorToken(DollarSign, s.Position.line)
 	case ch == ':':
-		return newOperatorToken(Colon, s.line)
+		return newOperatorToken(Colon, s.Position.line)
 	case ch == '|':
-		return newOperatorToken(Pipe, s.line)
+		return newOperatorToken(Pipe, s.Position.line)
 	case ch == '-':
-		return newOperatorToken(Dash, s.line)
+		return newOperatorToken(Dash, s.Position.line)
 	case unicode.IsDigit(ch):
 		return s.scanNumber(ch)
 	case ch == '"', ch == '\'':
@@ -195,14 +170,12 @@ func (s *Scanner) NextToken() Token {
 }
 
 func (s *Scanner) consumeWhitespace(ch rune) {
-	s.incLine(ch)
 	for {
 		ch := s.next()
 		if !isSpace(ch) {
 			s.prev()
 			break
 		}
-		s.incLine(ch)
 	}
 }
 
@@ -210,7 +183,7 @@ func (s *Scanner) consumeMultilineComment() {
 	for {
 		ch := s.next()
 		if ch == eof {
-			s.reporter.Error(s.line, "unterminated comment")
+			s.reporter.Error(s.Position.line, "unterminated comment")
 			return
 		}
 		if ch == '*' {
@@ -218,9 +191,7 @@ func (s *Scanner) consumeMultilineComment() {
 			if ch == '/' {
 				return
 			}
-			s.incLine(ch)
 		}
-		s.incLine(ch)
 	}
 }
 
@@ -231,7 +202,6 @@ func (s *Scanner) consumeSingleLineComment() {
 			return
 		}
 		if ch == '\n' {
-			s.incLine(ch)
 			return
 		}
 	}
@@ -249,10 +219,10 @@ func (s *Scanner) scanIdentifier(ch rune) Token {
 			break
 		}
 	}
-	if token, ok := reservedWords.token(b.String(), s.line); ok {
+	if token, ok := reservedWords.token(b.String(), s.Position.line); ok {
 		return token
 	}
-	return newIdentifierToken(b.String(), s.line)
+	return newIdentifierToken(b.String(), s.Position.line)
 }
 
 func (s *Scanner) scanNumber(ch rune) Token {
@@ -275,7 +245,7 @@ func (s *Scanner) scanNumber(ch rune) Token {
 			return s.scanDouble(&b)
 		default:
 			s.prev()
-			return newIntegerToken(DecimalInteger, "0", 10, s.line)
+			return newIntegerToken(DecimalInteger, "0", 10, s.Position.line)
 		}
 	case '.':
 		return s.scanDouble(&b)
@@ -284,7 +254,7 @@ func (s *Scanner) scanNumber(ch rune) Token {
 		ch := s.next()
 		if ch == eof {
 			s.prev()
-			return newIntegerToken(DecimalInteger, b.String(), 10, s.line)
+			return newIntegerToken(DecimalInteger, b.String(), 10, s.Position.line)
 		}
 		switch ch {
 		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
@@ -297,7 +267,7 @@ func (s *Scanner) scanNumber(ch rune) Token {
 			return s.scanExponent(&b)
 		default:
 			s.prev()
-			return newIntegerToken(DecimalInteger, b.String(), 10, s.line)
+			return newIntegerToken(DecimalInteger, b.String(), 10, s.Position.line)
 		}
 	}
 }
@@ -308,7 +278,7 @@ func (s *Scanner) scanDouble(b *strings.Builder) Token {
 		b.WriteRune(ch)
 	default:
 		s.prev()
-		s.reporter.Error(s.line, "expecting fractional part of double")
+		s.reporter.Error(s.Position.line, "expecting fractional part of double")
 		return newIllegalToken(b.String())
 	}
 	for {
@@ -320,7 +290,7 @@ func (s *Scanner) scanDouble(b *strings.Builder) Token {
 			return s.scanExponent(b)
 		default:
 			s.prev()
-			return newDoubleToken(b.String(), s.line)
+			return newDoubleToken(b.String(), s.Position.line)
 		}
 	}
 }
@@ -335,10 +305,10 @@ func (s *Scanner) scanHexInteger(b *strings.Builder) Token {
 		default:
 			s.prev()
 			if len(b.String()) < 3 {
-				s.reporter.Error(s.line, "expecting hex digit following 'x'")
+				s.reporter.Error(s.Position.line, "expecting hex digit following 'x'")
 				return newIllegalToken(b.String())
 			}
-			return newIntegerToken(HexInteger, b.String(), 0, s.line)
+			return newIntegerToken(HexInteger, b.String(), 0, s.Position.line)
 		}
 	}
 }
@@ -350,7 +320,7 @@ func (s *Scanner) scanOctInteger(b *strings.Builder) Token {
 			b.WriteRune(ch)
 		default:
 			s.prev()
-			return newIntegerToken(OctInteger, b.String(), 0, s.line)
+			return newIntegerToken(OctInteger, b.String(), 0, s.Position.line)
 		}
 	}
 }
@@ -361,11 +331,11 @@ func (s *Scanner) scanExponent(b *strings.Builder) Token {
 		case '-':
 			if i > 0 {
 				s.prev()
-				s.reporter.Error(s.line, "invalid exponent")
+				s.reporter.Error(s.Position.line, "invalid exponent")
 				return newIllegalToken(b.String())
 			}
 			if !isDigit(s.peek()) {
-				s.reporter.Error(s.line, "invalid exponent")
+				s.reporter.Error(s.Position.line, "invalid exponent")
 				return newIllegalToken(b.String())
 			}
 			b.WriteRune(ch)
@@ -375,16 +345,16 @@ func (s *Scanner) scanExponent(b *strings.Builder) Token {
 			s.prev()
 			switch i {
 			case 0:
-				s.reporter.Error(s.line, "expecting exponent")
+				s.reporter.Error(s.Position.line, "expecting exponent")
 				return newIllegalToken(b.String())
 			case 1:
 				if ch == '-' {
-					s.reporter.Error(s.line, "expecting digit following '-' in exponent")
+					s.reporter.Error(s.Position.line, "expecting digit following '-' in exponent")
 					return newIllegalToken(b.String())
 				}
-				return newDoubleToken(b.String(), s.line)
+				return newDoubleToken(b.String(), s.Position.line)
 			default:
-				return newDoubleToken(b.String(), s.line)
+				return newDoubleToken(b.String(), s.Position.line)
 			}
 		}
 	}
@@ -398,13 +368,13 @@ func (s *Scanner) scanString(ch rune) Token {
 	for {
 		ch := s.next()
 		if ch == eof {
-			s.reporter.Error(s.line, fmt.Sprintf("expecting string end character '%s'", string(startCh)))
+			s.reporter.Error(s.Position.line, fmt.Sprintf("expecting string end character '%s'", string(startCh)))
 			return newIllegalToken(lexeme.String())
 		}
 		switch {
 		case ch == startCh:
 			lexeme.WriteRune(ch)
-			return newStringToken(lexeme.String(), literal.String(), s.line)
+			return newStringToken(lexeme.String(), literal.String(), s.Position.line)
 		case ch == '\\':
 			lexeme.WriteRune(ch)
 			literal.WriteRune(s.scanEscapeCharacter())
@@ -418,7 +388,7 @@ func (s *Scanner) scanString(ch rune) Token {
 func (s *Scanner) scanEscapeCharacter() rune {
 	ch := s.next()
 	if ch == eof {
-		s.reporter.Error(s.line, fmt.Sprintf("incomplete character escape"))
+		s.reporter.Error(s.Position.line, fmt.Sprintf("incomplete character escape"))
 		return 0
 	}
 	switch ch {
@@ -440,12 +410,12 @@ func (s *Scanner) scanEscapeCharacter() rune {
 		for i := 0; i < 4; i++ {
 			ch := s.next()
 			if ch == eof {
-				s.reporter.Error(s.line, fmt.Sprintf("incomplete character escape"))
+				s.reporter.Error(s.Position.line, fmt.Sprintf("incomplete character escape"))
 				return 0
 			}
 			ok := unicode.In(ch, unicode.ASCII_Hex_Digit)
 			if !ok {
-				s.reporter.Error(s.line, fmt.Sprintf("invalid escaped unicode character"))
+				s.reporter.Error(s.Position.line, fmt.Sprintf("invalid escaped unicode character"))
 				return 0
 			}
 			b.WriteRune(ch)
@@ -458,12 +428,12 @@ func (s *Scanner) scanEscapeCharacter() rune {
 		for i := 0; i < 8; i++ {
 			ch := s.next()
 			if ch == eof {
-				s.reporter.Error(s.line, fmt.Sprintf("incomplete character escape"))
+				s.reporter.Error(s.Position.line, fmt.Sprintf("incomplete character escape"))
 				return 0
 			}
 			ok := unicode.In(ch, unicode.ASCII_Hex_Digit)
 			if !ok {
-				s.reporter.Error(s.line, fmt.Sprintf("invalid escaped unicode character"))
+				s.reporter.Error(s.Position.line, fmt.Sprintf("invalid escaped unicode character"))
 				return 0
 			}
 			b.WriteRune(ch)
@@ -476,19 +446,10 @@ func (s *Scanner) scanEscapeCharacter() rune {
 
 func (s *Scanner) consumeNonWhitespace() {
 	for {
-		ch, _, err := s.input.ReadRune()
-		if err != nil {
-			s.eof = true
-		}
+		ch := s.next()
 		if !isSpace(ch) {
-			_ = s.input.UnreadRune()
+			s.prev()
 			break
 		}
-	}
-}
-
-func (s *Scanner) incLine(ch rune) {
-	if ch == '\n' {
-		s.line = s.line + 1
 	}
 }
