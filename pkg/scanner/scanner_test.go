@@ -138,6 +138,7 @@ func TestPunctuation(t *testing.T) {
 		"greaterthan/ws":       {"a > b", []TokenType{Identifier, GreaterThan, Identifier, EndOfInput}},
 		"greaterthanorequal":   {"a>=b", []TokenType{Identifier, GreaterThanOrEqual, Identifier, EndOfInput}},
 		"greaterhanorequal/ws": {"a >= b", []TokenType{Identifier, GreaterThanOrEqual, Identifier, EndOfInput}},
+		"illegal character":    {"a—b", []TokenType{Identifier, GreaterThanOrEqual, Identifier, EndOfInput}},
 	}
 
 	for name, tc := range tests {
