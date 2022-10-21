@@ -189,6 +189,12 @@ type SymbolicFunctionName struct {
 	FunctionName SymbolicName
 }
 
+type ListOperatorExpr struct {
+	Op      Operator
+	Expr    Expr
+	EndExpr Expr
+}
+
 type ExistsFunctionName struct{}
 
 func (e *OpExpr) exprNode()                   {}
@@ -209,6 +215,7 @@ func (e *VariableExpr) exprNode()             {}
 func (e *PatternComprehensionExpr) exprNode() {}
 func (e *RelationshipsPattern) exprNode()     {}
 func (e *FunctionInvocation) exprNode()       {}
+func (e *ListOperatorExpr) exprNode()         {}
 
 func (s *SymbolicNameIdentifier) symbolicNameNode() {}
 func (s *SymbolicNameHexLetter) symbolicNameNode()  {}

@@ -469,12 +469,12 @@ func (p *Parser) listOpExpr() (ast.Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &ast.UnaryExpr{ast.InList, list}, nil
+		return &ast.ListOperatorExpr{Op: ast.InList, Expr: list}, nil
 	}
 	if _, ok, err := p.match(scanner.OpenBracket); err != nil {
 		return nil, err
 	} else if ok {
-		start, err := p.expr()
+		expr, err := p.expr()
 		if err != nil {
 			return nil, err
 		}
@@ -483,16 +483,13 @@ func (p *Parser) listOpExpr() (ast.Expr, error) {
 		} else if ok {
 			switch t.T {
 			case scanner.CloseBracket:
-				if start == nil {
-					return nil, p.reporter.Error(t.Line, "expecting index expression")
-				}
-				return &ast.UnaryExpr{ast.ListIndex, start}, nil
+				return &ast.ListOperatorExpr{Op: ast.ListIndex, Expr: expr}, nil
 			case scanner.Dotdot:
 				end, err := p.expr()
 				if err != nil {
 					return nil, err
 				}
-				return &ast.BinaryExpr{start, ast.ListRange, end}, nil
+				return &ast.ListOperatorExpr{Op: ast.ListRange, Expr: expr, EndExpr: end}, nil
 			}
 		}
 	}
@@ -1131,6 +1128,11 @@ func (p *Parser) mapLiteral() (ast.Expr, error) {
 			return nil, p.reporter.Error(p.scanner.Line(), "expecting expression following ':'")
 		}
 		literal.PropertyKeyNames = append(literal.PropertyKeyNames, pkn)
+		if _, ok, err := p.match(scanner.Comma); err != nil {
+			return nil, err
+		} else if !ok {
+			break
+		}
 	}
 	if t, ok, err := p.match(scanner.CloseBrace); err != nil {
 		return nil, err

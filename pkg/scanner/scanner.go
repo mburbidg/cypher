@@ -258,6 +258,9 @@ func (s *Scanner) scanNumber(ch rune) Token {
 		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 			b.WriteRune(ch)
 		case '.':
+			if s.peek() == '.' {
+				return newIntegerToken(DecimalInteger, b.String(), 10, s.Position.line)
+			}
 			b.WriteRune(ch)
 			return s.scanDouble(&b)
 		case 'E':
