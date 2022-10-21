@@ -13,7 +13,7 @@ var opForTokens = map[scanner.TokenType]ast.Operator{
 	scanner.LessThanOrEqual:    ast.LessThanOrEqual,
 	scanner.GreaterThanOrEqual: ast.GreaterThanOrEqual,
 	scanner.Plus:               ast.Add,
-	scanner.Minus:              ast.Subtract,
+	scanner.Dash:               ast.Subtract,
 	scanner.Star:               ast.Multiply,
 	scanner.ForwardSlash:       ast.Divide,
 	scanner.Percent:            ast.Modulo,

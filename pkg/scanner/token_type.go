@@ -19,7 +19,7 @@ const (
 	OpenBracket
 	CloseBracket
 	Plus
-	Minus
+	Dash
 	Star
 	ForwardSlash
 	Percent
@@ -33,7 +33,6 @@ const (
 	DollarSign
 	Colon
 	Pipe
-	Dash
 
 	Identifier
 	Double
