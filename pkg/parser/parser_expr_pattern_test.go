@@ -51,3 +51,36 @@ func TestPatternPredicate(t *testing.T) {
 		})
 	}
 }
+
+// mathematical/pattern2.feature
+func TestPatternComprehension(t *testing.T) {
+	tests := map[string]struct {
+		src   string
+		valid bool
+	}{
+		"[p = (n)-->() | p]":                       {"[p = (n)-->() | p]", true},
+		"[p = (n)-->(:B) | p]":                     {"[p = (n)-->(:B) | p]", true},
+		"[p = (a)-->(b) | p]":                      {"[p = (a)-->(b) | p]", true},
+		"[(n)-[:T]->(b) | b.name]":                 {"[(n)-[:T]->(b) | b.name]", true},
+		"[(n)-[r:T]->() | r.name]":                 {"[(n)-[r:T]->() | r.name]", true},
+		"count([p = (n)-[:HAS]->() | p])":          {"count([p = (n)-[:HAS]->() | p])", true},
+		"[x IN nodes(p) | size([(x)-->(:Y) | 1])]": {"[x IN nodes(p) | size([(x)-->(:Y) | 1])]", true},
+		"[p = (n)-[:HAS]->() | p]":                 {"[p = (n)-[:HAS]->() | p]", true},
+		"[p = (a)-[*]->(b) | p]":                   {"[p = (a)-[*]->(b) | p]", true},
+		"[p = (liker)--() | p]":                    {"[p = (liker)--() | p]", true},
+	}
+	reporter := newTestReporter()
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			s := scanner.New([]byte(tc.src), reporter)
+			p := New(s, reporter)
+			tree, err := p.Parse()
+			if tc.valid {
+				assert.NoError(t, err)
+				assert.NotNil(t, tree)
+			} else {
+				assert.Error(t, err)
+			}
+		})
+	}
+}

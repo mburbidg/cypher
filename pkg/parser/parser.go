@@ -500,11 +500,15 @@ func (p *Parser) listOpExpr() (ast.Expr, error) {
 }
 
 func (p *Parser) atom() (ast.Expr, error) {
-	if expr, err := p.literal(); err != nil {
-		return nil, err
-	} else if expr != nil {
+	pos := p.scanner.Position
+	if expr, _ := p.patternComprehensionExpr(); expr != nil {
 		return expr, nil
 	}
+	p.scanner.Position = pos
+	if expr, _ := p.literal(); expr != nil {
+		return expr, nil
+	}
+	p.scanner.Position = pos
 	if expr, err := p.parameter(); err != nil {
 		return nil, err
 	} else if expr != nil {
@@ -525,17 +529,11 @@ func (p *Parser) atom() (ast.Expr, error) {
 	} else if expr != nil {
 		return expr, nil
 	}
-	if expr, err := p.patternComprehensionExpr(); err != nil {
-		return nil, err
-	} else if expr != nil {
-		return expr, nil
-	}
 	if expr, err := p.builtInFunction(); err != nil {
 		return nil, err
 	} else if expr != nil {
 		return expr, nil
 	}
-	pos := p.scanner.Position
 	if expr, _ := p.relationshipsPattern(); expr != nil {
 		return expr, nil
 	}
@@ -545,7 +543,6 @@ func (p *Parser) atom() (ast.Expr, error) {
 	} else if expr != nil {
 		return expr, nil
 	}
-	pos = p.scanner.Position
 	if expr, err := p.functionInvocation(); err != nil {
 		return nil, err
 	} else if expr != nil {
@@ -864,7 +861,7 @@ func (p *Parser) patternComprehensionExpr() (ast.Expr, error) {
 	} else if !ok {
 		return nil, p.reporter.Error(t.Line, "expecting ']'")
 	}
-	return nil, nil
+	return patternExpr, nil
 }
 
 func (p *Parser) relationshipsPattern() (*ast.RelationshipsPattern, error) {
