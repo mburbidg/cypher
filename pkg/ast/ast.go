@@ -79,9 +79,13 @@ type ReservedWord struct {
 type Label struct {
 }
 
-type Literal struct {
+type PrimitiveLiteral struct {
 	Kind  scanner.TokenType
 	Value interface{}
+}
+
+type ListLiteral struct {
+	Items []Expr
 }
 
 type Parameter struct {
@@ -192,7 +196,9 @@ func (e *UnaryExpr) exprNode()                {}
 func (e *BinaryExpr) exprNode()               {}
 func (e *TernaryExpr) exprNode()              {}
 func (e *ListExpr) exprNode()                 {}
-func (e *Literal) exprNode()                  {}
+func (e *PrimitiveLiteral) exprNode()         {}
+func (e *ListLiteral) exprNode()              {}
+func (e *MapLiteral) exprNode()               {}
 func (e *PropertyLabelsExpr) exprNode()       {}
 func (e *Parameter) exprNode()                {}
 func (e *CaseExpr) exprNode()                 {}

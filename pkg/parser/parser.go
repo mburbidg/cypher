@@ -195,7 +195,7 @@ func (p *Parser) addOrSubtractExpr() (ast.Expr, error) {
 		return nil, err
 	}
 	for {
-		t, ok, err := p.match(scanner.Plus, scanner.Minus)
+		t, ok, err := p.match(scanner.Plus, scanner.Dash)
 		switch {
 		case err != nil:
 			return nil, err
@@ -265,7 +265,7 @@ func (p *Parser) powerExpr() (ast.Expr, error) {
 func (p *Parser) unaryAddOrSubtract() (ast.Expr, error) {
 	tokenTypes := []scanner.TokenType{
 		scanner.Plus,
-		scanner.Minus,
+		scanner.Dash,
 	}
 	negate := false
 	for {
@@ -273,7 +273,7 @@ func (p *Parser) unaryAddOrSubtract() (ast.Expr, error) {
 		if err != nil {
 			return nil, err
 		} else if ok {
-			if t.T == scanner.Minus {
+			if t.T == scanner.Dash {
 				negate = !negate
 			}
 		} else {
@@ -400,7 +400,7 @@ func (p *Parser) NodeLabel() (ast.SchemaName, error) {
 			return nil, err
 		}
 		if s == nil {
-			p.reporter.Error(p.scanner.Line(), "expecting schema name following ':'")
+			return nil, p.reporter.Error(p.scanner.Line(), "expecting schema name following ':'")
 		}
 		return s, nil
 	}
@@ -566,16 +566,26 @@ func (p *Parser) literal() (ast.Expr, error) {
 	} else if ok {
 		switch t.T {
 		case scanner.DecimalInteger, scanner.HexInteger, scanner.OctInteger:
-			return &ast.Literal{scanner.Integer, t.Literal}, nil
+			return &ast.PrimitiveLiteral{scanner.Integer, t.Literal}, nil
 		case scanner.Double, scanner.String:
-			return &ast.Literal{t.T, t.Literal}, nil
+			return &ast.PrimitiveLiteral{t.T, t.Literal}, nil
 		case scanner.False:
-			return &ast.Literal{t.T, false}, nil
+			return &ast.PrimitiveLiteral{t.T, false}, nil
 		case scanner.True:
-			return &ast.Literal{t.T, true}, nil
+			return &ast.PrimitiveLiteral{t.T, true}, nil
 		case scanner.Null:
-			return &ast.Literal{Kind: t.T}, nil
+			return &ast.PrimitiveLiteral{Kind: t.T}, nil
 		}
+	}
+	if expr, err := p.mapLiteral(); err != nil {
+		return nil, err
+	} else if expr != nil {
+		return expr, nil
+	}
+	if expr, err := p.listLiteral(); err != nil {
+		return nil, err
+	} else if expr != nil {
+		return expr, nil
 	}
 	return nil, nil
 }
@@ -786,7 +796,7 @@ func (p *Parser) variable() (ast.Expr, error) {
 		return nil, err
 	}
 	if s == nil {
-		return nil, p.reporter.Error(p.scanner.Line(), "expecting variable")
+		return nil, nil
 	}
 	return &ast.VariableExpr{s}, nil
 }
@@ -978,11 +988,12 @@ func (p *Parser) relationshipDetail() (*ast.RelationshipDetail, error) {
 func (p *Parser) properties() (*ast.Properties, error) {
 	var err error
 	properties := &ast.Properties{}
-	properties.MapLiteral, err = p.mapLiteral()
+	expr, err := p.mapLiteral()
 	if err != nil {
 		return nil, err
 	}
-	if properties.MapLiteral != nil {
+	if expr != nil {
+		properties.MapLiteral = expr.(*ast.MapLiteral)
 		return properties, nil
 	}
 	properties.Parameter, err = p.parameter()
@@ -1002,7 +1013,7 @@ func (p *Parser) rangeLiteral() (*ast.RangeLiteral, error) {
 	} else if !ok {
 		return nil, nil
 	}
-	if t, ok, err := p.match(scanner.Integer); err != nil {
+	if t, ok, err := p.match(scanner.DecimalInteger, scanner.HexInteger, scanner.OctInteger); err != nil {
 		return nil, err
 	} else if ok {
 		literal.Begin = t.Literal.(int64)
@@ -1010,7 +1021,7 @@ func (p *Parser) rangeLiteral() (*ast.RangeLiteral, error) {
 	if _, ok, err := p.match(scanner.Dotdot); err != nil {
 		return nil, err
 	} else if ok {
-		if t, ok, err := p.match(scanner.Integer); err != nil {
+		if t, ok, err := p.match(scanner.DecimalInteger, scanner.HexInteger, scanner.OctInteger); err != nil {
 			return nil, err
 		} else if ok {
 			literal.End = t.Literal.(int64)
@@ -1040,7 +1051,10 @@ func (p *Parser) relationshipTypes() ([]ast.SchemaName, error) {
 		} else if !ok {
 			return typeNames, nil
 		}
-		p.match(scanner.Colon)
+		_, _, err := p.match(scanner.Colon)
+		if err != nil {
+			return nil, err
+		}
 		s, err := p.schemaName()
 		if err != nil {
 			return nil, err
@@ -1067,11 +1081,11 @@ func (p *Parser) nodePattern() (*ast.NodePattern, error) {
 	if err != nil {
 		return nil, err
 	}
-	literal, err := p.mapLiteral()
+	expr, err := p.mapLiteral()
 	if err != nil {
 		return nil, err
 	}
-	if literal == nil {
+	if expr == nil {
 		parameter, err := p.parameter()
 		if err != nil {
 			return nil, err
@@ -1080,7 +1094,7 @@ func (p *Parser) nodePattern() (*ast.NodePattern, error) {
 			np.Properties = &ast.Properties{Parameter: parameter}
 		}
 	} else {
-		np.Properties = &ast.Properties{MapLiteral: literal}
+		np.Properties = &ast.Properties{MapLiteral: expr.(*ast.MapLiteral)}
 	}
 	if t, ok, err := p.match(scanner.CloseParen); err != nil {
 		return nil, err
@@ -1090,7 +1104,7 @@ func (p *Parser) nodePattern() (*ast.NodePattern, error) {
 	return np, nil
 }
 
-func (p *Parser) mapLiteral() (*ast.MapLiteral, error) {
+func (p *Parser) mapLiteral() (ast.Expr, error) {
 	if _, ok, err := p.match(scanner.OpenBrace); err != nil {
 		return nil, err
 	} else if !ok {
@@ -1235,4 +1249,40 @@ func (p *Parser) namespace() ([]ast.SymbolicName, error) {
 		namespace = append(namespace, sn)
 	}
 	return namespace, nil
+}
+
+func (p *Parser) listLiteral() (ast.Expr, error) {
+	if _, ok, err := p.match(scanner.OpenBracket); err != nil {
+		return nil, err
+	} else if !ok {
+		return nil, nil
+	}
+	items := []ast.Expr{}
+	expr, err := p.expr()
+	if err != nil {
+		return nil, err
+	}
+	if expr != nil {
+		items = append(items, expr)
+	}
+	for {
+		if _, ok, err := p.match(scanner.Comma); err != nil {
+			return nil, err
+		} else if !ok {
+			break
+		}
+		expr, err := p.expr()
+		if err != nil {
+			return nil, err
+		}
+		if expr != nil {
+			items = append(items, expr)
+		}
+	}
+	if t, ok, err := p.match(scanner.CloseBracket); err != nil {
+		return nil, err
+	} else if !ok {
+		return nil, p.reporter.Error(t.Line, "expecting ']' to close a list")
+	}
+	return &ast.ListLiteral{Items: items}, nil
 }

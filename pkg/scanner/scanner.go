@@ -107,7 +107,7 @@ func (s *Scanner) NextToken() Token {
 	case ch == '+':
 		return newOperatorToken(Plus, s.Position.line)
 	case ch == '-':
-		return newOperatorToken(Minus, s.Position.line)
+		return newOperatorToken(Dash, s.Position.line)
 	case ch == '*':
 		return newOperatorToken(Star, s.Position.line)
 	case ch == '/':
@@ -153,8 +153,6 @@ func (s *Scanner) NextToken() Token {
 		return newOperatorToken(Colon, s.Position.line)
 	case ch == '|':
 		return newOperatorToken(Pipe, s.Position.line)
-	case ch == '-':
-		return newOperatorToken(Dash, s.Position.line)
 	case unicode.IsDigit(ch):
 		return s.scanNumber(ch)
 	case ch == '"', ch == '\'':
