@@ -1,8 +1,6 @@
 package parser
 
 import (
-	"github.com/mburbidg/cypher/pkg/scanner"
-	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -23,15 +21,7 @@ func TestNoneQuantifier(t *testing.T) {
 	reporter := newTestReporter()
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			s := scanner.New([]byte(tc.src), reporter)
-			p := New(s, reporter)
-			tree, err := p.Parse()
-			if tc.valid {
-				assert.NoError(t, err)
-				assert.NotNil(t, tree)
-			} else {
-				assert.Error(t, err)
-			}
+			runTest(t, reporter, tc)
 		})
 	}
 }
@@ -49,15 +39,7 @@ func TestSingleQuantifier(t *testing.T) {
 	reporter := newTestReporter()
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			s := scanner.New([]byte(tc.src), reporter)
-			p := New(s, reporter)
-			tree, err := p.Parse()
-			if tc.valid {
-				assert.NoError(t, err)
-				assert.NotNil(t, tree)
-			} else {
-				assert.Error(t, err)
-			}
+			runTest(t, reporter, tc)
 		})
 	}
 }
@@ -79,15 +61,7 @@ func TestAnyQuantifier(t *testing.T) {
 	reporter := newTestReporter()
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			s := scanner.New([]byte(tc.src), reporter)
-			p := New(s, reporter)
-			tree, err := p.Parse()
-			if tc.valid {
-				assert.NoError(t, err)
-				assert.NotNil(t, tree)
-			} else {
-				assert.Error(t, err)
-			}
+			runTest(t, reporter, tc)
 		})
 	}
 }
@@ -105,15 +79,7 @@ func TestAllQuantifier(t *testing.T) {
 	reporter := newTestReporter()
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			s := scanner.New([]byte(tc.src), reporter)
-			p := New(s, reporter)
-			tree, err := p.Parse()
-			if tc.valid {
-				assert.NoError(t, err)
-				assert.NotNil(t, tree)
-			} else {
-				assert.Error(t, err)
-			}
+			runTest(t, reporter, tc)
 		})
 	}
 }
@@ -133,15 +99,7 @@ func TestNoneQuantifierInterop(t *testing.T) {
 	reporter := newTestReporter()
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			s := scanner.New([]byte(tc.src), reporter)
-			p := New(s, reporter)
-			tree, err := p.Parse()
-			if tc.valid {
-				assert.NoError(t, err)
-				assert.NotNil(t, tree)
-			} else {
-				assert.Error(t, err)
-			}
+			runTest(t, reporter, tc)
 		})
 	}
 }
