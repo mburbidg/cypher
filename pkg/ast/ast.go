@@ -104,7 +104,7 @@ type CaseAltNode struct {
 	Then Expr
 }
 
-type BuiltInExpr struct {
+type QuantifierExpr struct {
 	Op   Operator
 	Expr Expr
 }
@@ -210,7 +210,7 @@ func (e *Parameter) exprNode()                {}
 func (e *CaseExpr) exprNode()                 {}
 func (e *ListComprehensionExpr) exprNode()    {}
 func (e *FilterExpr) exprNode()               {}
-func (e *BuiltInExpr) exprNode()              {}
+func (e *QuantifierExpr) exprNode()           {}
 func (e *VariableExpr) exprNode()             {}
 func (e *PatternComprehensionExpr) exprNode() {}
 func (e *RelationshipsPattern) exprNode()     {}

@@ -5,6 +5,7 @@ import (
 	"github.com/mburbidg/cypher/pkg/scanner"
 	"github.com/mburbidg/cypher/pkg/utils"
 	"math"
+	"strings"
 )
 
 type Parser struct {
@@ -568,7 +569,7 @@ func (p *Parser) atom() (ast.Expr, error) {
 	} else if expr != nil {
 		return expr, nil
 	}
-	if expr, err := p.builtInFunction(); err != nil {
+	if expr, err := p.quantifierFunction(); err != nil {
 		return nil, err
 	} else if expr != nil {
 		return expr, nil
@@ -788,42 +789,53 @@ func (p *Parser) filterExpr() (ast.Expr, error) {
 	return filterExpr, nil
 }
 
-var builtInNames = map[string]ast.Operator{
+var quantifierNames = map[string]ast.Operator{
 	"ALL":    ast.AllOp,
 	"ANY":    ast.AnyOp,
 	"NONE":   ast.NoneOp,
 	"SINGLE": ast.SingleOp,
 }
 
-func (p *Parser) builtInFunction() (ast.Expr, error) {
+func (p *Parser) quantifierFunction() (ast.Expr, error) {
 	pos := p.scanner.Position
-	if t, ok, err := p.match(scanner.Identifier); err != nil {
+	// 'ALL' is a keyword, the other three are not, so they are handled separately. The following code figures
+	// out the quantifier operation being invoked.
+	var op ast.Operator
+	if t, ok, err := p.match(scanner.Identifier, scanner.All); err != nil {
 		return nil, err
 	} else if ok {
-		if op, ok := builtInNames[t.Lexeme]; ok {
-			if _, ok, err := p.match(scanner.OpenParen); err != nil {
-				return nil, err
-			} else if !ok {
-				return nil, p.reporter.Error(p.scanner.Line(), "expecting '('")
+		switch t.T {
+		case scanner.Identifier:
+			if op, ok = quantifierNames[strings.ToUpper(t.Lexeme)]; !ok {
+				p.scanner.Position = pos
+				return nil, nil
 			}
-			expr, err := p.filterExpr()
-			if err != nil {
-				return nil, err
-			}
-			if expr == nil {
-				return nil, p.reporter.Error(p.scanner.Line(), "expecting filter expression")
-			}
-			if _, ok, err := p.match(scanner.OpenParen); err != nil {
-				return nil, err
-			} else if !ok {
-				return nil, p.reporter.Error(p.scanner.Line(), "expecting ')'")
-			}
-			return &ast.BuiltInExpr{op, expr}, nil
-		} else {
-			p.scanner.Position = pos
+		case scanner.All:
+			op = ast.AllOp
 		}
+	} else {
+		return nil, nil
 	}
-	return nil, nil
+
+	// Now parse the rest of the quantifier invocation.
+	if _, ok, err := p.match(scanner.OpenParen); err != nil {
+		return nil, err
+	} else if !ok {
+		return nil, p.reporter.Error(p.scanner.Line(), "expecting '('")
+	}
+	expr, err := p.filterExpr()
+	if err != nil {
+		return nil, err
+	}
+	if expr == nil {
+		return nil, p.reporter.Error(p.scanner.Line(), "expecting filter expression")
+	}
+	if _, ok, err := p.match(scanner.CloseParen); err != nil {
+		return nil, err
+	} else if !ok {
+		return nil, p.reporter.Error(p.scanner.Line(), "expecting ')'")
+	}
+	return &ast.QuantifierExpr{op, expr}, nil
 }
 
 func (p *Parser) variable() (ast.Expr, error) {
