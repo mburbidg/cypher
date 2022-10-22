@@ -104,7 +104,7 @@ type CaseAltNode struct {
 	Then Expr
 }
 
-type BuiltInExpr struct {
+type QuantifierExpr struct {
 	Op   Operator
 	Expr Expr
 }
@@ -189,6 +189,12 @@ type SymbolicFunctionName struct {
 	FunctionName SymbolicName
 }
 
+type ListOperatorExpr struct {
+	Op      Operator
+	Expr    Expr
+	EndExpr Expr
+}
+
 type ExistsFunctionName struct{}
 
 func (e *OpExpr) exprNode()                   {}
@@ -204,11 +210,12 @@ func (e *Parameter) exprNode()                {}
 func (e *CaseExpr) exprNode()                 {}
 func (e *ListComprehensionExpr) exprNode()    {}
 func (e *FilterExpr) exprNode()               {}
-func (e *BuiltInExpr) exprNode()              {}
+func (e *QuantifierExpr) exprNode()           {}
 func (e *VariableExpr) exprNode()             {}
 func (e *PatternComprehensionExpr) exprNode() {}
 func (e *RelationshipsPattern) exprNode()     {}
 func (e *FunctionInvocation) exprNode()       {}
+func (e *ListOperatorExpr) exprNode()         {}
 
 func (s *SymbolicNameIdentifier) symbolicNameNode() {}
 func (s *SymbolicNameHexLetter) symbolicNameNode()  {}

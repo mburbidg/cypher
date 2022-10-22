@@ -239,6 +239,10 @@ func (s *Scanner) scanNumber(ch rune) Token {
 			b.WriteRune(ch)
 			return s.scanExponent(&b)
 		case '.':
+			if s.peek() == '.' {
+				s.prev()
+				return newIntegerToken(DecimalInteger, b.String(), 10, s.Position.line)
+			}
 			b.WriteRune(ch)
 			return s.scanDouble(&b)
 		default:
@@ -258,6 +262,10 @@ func (s *Scanner) scanNumber(ch rune) Token {
 		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 			b.WriteRune(ch)
 		case '.':
+			if s.peek() == '.' {
+				s.prev()
+				return newIntegerToken(DecimalInteger, b.String(), 10, s.Position.line)
+			}
 			b.WriteRune(ch)
 			return s.scanDouble(&b)
 		case 'E':
