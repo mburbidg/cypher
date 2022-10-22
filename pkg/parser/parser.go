@@ -471,29 +471,71 @@ func (p *Parser) listOpExpr() (ast.Expr, error) {
 		}
 		return &ast.ListOperatorExpr{Op: ast.InList, Expr: list}, nil
 	}
+
 	if _, ok, err := p.match(scanner.OpenBracket); err != nil {
 		return nil, err
+	} else if !ok {
+		return nil, nil
+	}
+
+	// First check to see if this is slice operator with no start slice expression. The p.expr() method expects
+	// to parse an expression, so we need to check for the '..' terminal case first.
+	if _, ok, err := p.match(scanner.Dotdot); err != nil {
+		return nil, err
 	} else if ok {
-		expr, err := p.expr()
+		// Found '..', meaning there was no start slice expression. The end slice expression is also optional,
+		// so first check for the ']' terminal case.
+		if _, ok, err := p.match(scanner.CloseBracket); err != nil {
+			return nil, err
+		} else if ok {
+			return &ast.ListOperatorExpr{Op: ast.ListRange}, nil
+		}
+		endExpr, err := p.expr()
 		if err != nil {
 			return nil, err
 		}
-		if t, ok, err := p.match(scanner.CloseBracket, scanner.Dotdot); err != nil {
+		if _, ok, err := p.match(scanner.CloseBracket); err != nil {
 			return nil, err
 		} else if ok {
-			switch t.T {
-			case scanner.CloseBracket:
-				return &ast.ListOperatorExpr{Op: ast.ListIndex, Expr: expr}, nil
-			case scanner.Dotdot:
-				end, err := p.expr()
-				if err != nil {
-					return nil, err
-				}
-				return &ast.ListOperatorExpr{Op: ast.ListRange, Expr: expr, EndExpr: end}, nil
-			}
+			return &ast.ListOperatorExpr{Op: ast.ListRange, EndExpr: endExpr}, nil
 		}
+		return nil, p.reporter.Error(p.scanner.Line(), "expecting ']' to close a list operator")
 	}
-	return nil, nil
+
+	expr, err := p.expr()
+	if err != nil {
+		return nil, err
+	}
+	if _, ok, err := p.match(scanner.CloseBracket); err != nil {
+		return nil, err
+	} else if ok {
+		// Found ']' so this is a list index operation as opposed to a slice operation.
+		return &ast.ListOperatorExpr{Op: ast.ListIndex, Expr: expr}, nil
+	}
+
+	if _, ok, err := p.match(scanner.Dotdot); err != nil {
+		return nil, err
+	} else if !ok {
+		return nil, p.reporter.Error(p.scanner.Line(), "expecting '..' between begin and end slice expressions")
+	}
+
+	// This is a slice operation. We have parsed up to the token just past the '..'. Since the end expression
+	// is optional, check for the terminal case first.
+	if _, ok, err := p.match(scanner.CloseBracket); err != nil {
+		return nil, err
+	} else if ok {
+		return &ast.ListOperatorExpr{Op: ast.ListRange, Expr: expr}, nil
+	}
+	endExpr, err := p.expr()
+	if err != nil {
+		return nil, err
+	}
+	if _, ok, err := p.match(scanner.CloseBracket); err != nil {
+		return nil, err
+	} else if ok {
+		return &ast.ListOperatorExpr{Op: ast.ListRange, Expr: expr, EndExpr: endExpr}, nil
+	}
+	return nil, p.reporter.Error(p.scanner.Line(), "expecting ']' to close a list operator")
 }
 
 func (p *Parser) atom() (ast.Expr, error) {
@@ -1174,6 +1216,16 @@ func (p *Parser) functionInvocation() (ast.Expr, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Check first to see if we have a close paren, which indicates there were no arguments. The method
+	// p.expr() expects to find an expression, so we check the no arg case by checking for a close paren first.
+	if _, ok, err := p.match(scanner.CloseParen); err != nil {
+		return nil, err
+	} else if ok {
+		return &ast.FunctionInvocation{FunctionName: fn, Distinct: distinct}, nil
+	}
+
+	// The following code expects at least one argument.
 	args := []ast.Expr{}
 	expr, err := p.expr()
 	if err != nil {
@@ -1256,14 +1308,22 @@ func (p *Parser) listLiteral() (ast.Expr, error) {
 	} else if !ok {
 		return nil, nil
 	}
+
 	items := []ast.Expr{}
+
+	// We need to check first to see if the list is the empty list, since p.expr() expects to see an
+	// expression. We do this by checking for the list terminal ']'.
+	if _, ok, err := p.match(scanner.CloseBracket); err != nil {
+		return nil, err
+	} else if ok {
+		return &ast.ListLiteral{Items: items}, nil
+	}
+
 	expr, err := p.expr()
 	if err != nil {
 		return nil, err
 	}
-	if expr != nil {
-		items = append(items, expr)
-	}
+	items = append(items, expr)
 	for {
 		if _, ok, err := p.match(scanner.Comma); err != nil {
 			return nil, err
