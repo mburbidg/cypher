@@ -68,16 +68,50 @@ func (p *Parser) matchPhrase(tokenTypes ...scanner.TokenType) ([]scanner.Token, 
 }
 
 func (p *Parser) singlePartQuery() (ast.Query, error) {
-	q, err := p.createQuery()
-	if err != nil {
-		return nil, err
+	reading := []ast.Query{}
+	updating := []ast.Query{}
+
+	// Parse productions for reading which includes MATCH, UNWIND and CALL
+	for {
+		query, err := p.readingClause()
+		if err != nil {
+			return nil, err
+		}
+		if query == nil {
+			break
+		}
+		reading = append(reading, query)
 	}
+
+	// Parse productions for updating which includes CREATE, MERGE, DELETE, SET and REMOVE.
+	for {
+		query, err := p.updatingClause()
+		if err != nil {
+			return nil, err
+		}
+		if query == nil {
+			break
+		}
+		updating = append(updating, query)
+	}
+
+	// Parse productions for RETURN. If there were no updating queries then RETURN is required.
 	projection, err := p.parseReturn()
 	if err != nil {
 		return nil, err
 	}
-	q.SetProjection(projection)
-	return q, nil
+	if len(updating) == 0 && projection == nil {
+		return nil, p.reporter.Error(p.scanner.Line(), "expecting 'RETURN' following MATCH clause")
+	}
+	return &ast.SinglePartQuery{ReadingClause: reading, UpdatingClause: updating, Projection: projection}, nil
+}
+
+func (p *Parser) readingClause() (ast.Query, error) {
+	return p.matchQuery()
+}
+
+func (p *Parser) updatingClause() (ast.Query, error) {
+	return p.createQuery()
 }
 
 func (p *Parser) parseReturn() (*ast.Projection, error) {
@@ -255,6 +289,34 @@ func (p *Parser) limit() (ast.Expr, error) {
 	return expr, nil
 }
 
+func (p *Parser) matchQuery() (ast.Query, error) {
+	optional := false
+	if _, ok, err := p.match(scanner.Optional); err != nil {
+		return nil, err
+	} else if ok {
+		optional = true
+	}
+	if _, ok, err := p.match(scanner.Match); err != nil {
+		return nil, err
+	} else if !ok {
+		return nil, nil
+	}
+	pattern, err := p.pattern()
+	if err != nil {
+		return nil, err
+	}
+	if _, ok, err := p.match(scanner.Where); err != nil {
+		return nil, err
+	} else if !ok {
+		return &ast.MatchQuery{Optional: optional, Pattern: pattern}, nil
+	}
+	expr, err := p.expr()
+	if err != nil {
+		return nil, err
+	}
+	return &ast.MatchQuery{Optional: optional, Pattern: pattern, WhereExpr: expr}, nil
+}
+
 func (p *Parser) createQuery() (ast.Query, error) {
 	if _, ok, err := p.match(scanner.Create); err != nil {
 		return nil, err
@@ -266,10 +328,6 @@ func (p *Parser) createQuery() (ast.Query, error) {
 		return nil, err
 	}
 	return &ast.CreateQuery{Pattern: pattern}, nil
-}
-
-func (p *Parser) matchQuery() (ast.Query, error) {
-	return nil, nil
 }
 
 func (p *Parser) pattern() (*ast.Pattern, error) {
