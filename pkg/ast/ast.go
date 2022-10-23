@@ -7,20 +7,23 @@ type Node interface {
 
 type Query interface {
 	Node
-	SetProjection(projection *Projection)
+	queryNode()
 }
 
-type EmptyQuery struct {
+type SinglePartQuery struct {
+	ReadingClause  []Query
+	UpdatingClause []Query
 	*Projection
 }
 
 type CreateQuery struct {
 	Pattern *Pattern
-	*Projection
 }
 
 type MatchQuery struct {
-	*Projection
+	Optional  bool
+	Pattern   *Pattern
+	WhereExpr Expr
 }
 
 type Pattern struct {
@@ -260,15 +263,9 @@ type ListOperatorExpr struct {
 
 type ExistsFunctionName struct{}
 
-func (q *EmptyQuery) SetProjection(projection *Projection) {
-	q.Projection = projection
-}
-func (q *CreateQuery) SetProjection(projection *Projection) {
-	q.Projection = projection
-}
-func (q *MatchQuery) SetProjection(projection *Projection) {
-	q.Projection = projection
-}
+func (q *SinglePartQuery) queryNode() {}
+func (q *CreateQuery) queryNode()     {}
+func (q *MatchQuery) queryNode()      {}
 
 func (p *PatternElementPattern) patternElementNode() {}
 func (p *PatternElementNested) patternElementNode()  {}

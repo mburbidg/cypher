@@ -27,9 +27,13 @@ func TestCreatingNodes(t *testing.T) {
 		"CREATE (n {id: 12, name: 'foo'}) RETURN n.id AS id, n.name AS p": {"CREATE (n {id: 12, name: 'foo'}) RETURN n.id AS id, n.name AS p", true},
 		"CREATE (n {id: 12, name: null}) RETURN n.id AS id, n.name AS p":  {"CREATE (n {id: 12, name: null}) RETURN n.id AS id, n.name AS p", true},
 		"CREATE (p:TheLabel {id: 4611686018427387905}) RETURN p.id":       {"CREATE (p:TheLabel {id: 4611686018427387905}) RETURN p.id", true},
-		"CREATE (n:Foo)-[:T1]->(), (n:Bar)-[:T2]->()":                     {"CREATE (n:Foo)-[:T1]->(), (n:Bar)-[:T2]->()", true},
-		"CREATE ()<-[:T2]-(n:Foo), (n:Bar)<-[:T1]-()":                     {"CREATE ()<-[:T2]-(n:Foo), (n:Bar)<-[:T1]-()", true},
-		//"xxxx":                              {"xxxx", true},
+		"MATCH (a) CREATE (a)":                          {"MATCH (a) CREATE (a)", true},
+		"MATCH (a) CREATE (a {name: 'foo'}) RETURN a":   {"MATCH (a) CREATE (a {name: 'foo'}) RETURN a", true},
+		"CREATE (n:Foo)-[:T1]->(), (n:Bar)-[:T2]->()":   {"CREATE (n:Foo)-[:T1]->(), (n:Bar)-[:T2]->()", true},
+		"CREATE ()<-[:T2]-(n:Foo), (n:Bar)<-[:T1]-()":   {"CREATE ()<-[:T2]-(n:Foo), (n:Bar)<-[:T1]-()", true},
+		"CREATE (n:Foo) CREATE (n:Bar)-[:OWNS]->(:Dog)": {"CREATE (n:Foo) CREATE (n:Bar)-[:OWNS]->(:Dog)", true},
+		"CREATE (n {}) CREATE (n:Bar)-[:OWNS]->(:Dog)":  {"CREATE (n {}) CREATE (n:Bar)-[:OWNS]->(:Dog)", true},
+		"CREATE (n:Foo) CREATE (n {})-[:OWNS]->(:Dog)":  {"CREATE (n:Foo) CREATE (n {})-[:OWNS]->(:Dog)", true},
 	}
 	reporter := newTestReporter()
 	for name, tc := range tests {
