@@ -5,6 +5,69 @@ import "github.com/mburbidg/cypher/pkg/scanner"
 type Node interface {
 }
 
+type Query interface {
+	Node
+	SetProjection(projection *Projection)
+}
+
+type EmptyQuery struct {
+	*Projection
+}
+
+type CreateQuery struct {
+	Pattern *Pattern
+	*Projection
+}
+
+type MatchQuery struct {
+	*Projection
+}
+
+type Pattern struct {
+	Parts []*PatternPart
+}
+
+type PatternElement interface {
+	patternElementNode()
+}
+
+type PatternElementNested struct {
+	Element PatternElement
+}
+
+type PatternElementPattern struct {
+	Left  *NodePattern
+	Chain []*PatternElementChain
+}
+
+type PatternPart struct {
+	Variable Expr
+	Element  PatternElement
+}
+
+type Projection struct {
+	Distinct bool
+	Items    *ProjectionItems
+	Order    []*SortItem
+	Skip     Expr
+	Limit    Expr
+}
+
+type ProjectionItems struct {
+	All   bool
+	Items []*ProjectionItem
+}
+
+type ProjectionItem struct {
+	Expr     Expr
+	Variable Expr
+}
+
+type SortItem struct {
+	Expr  Expr
+	Order Order
+}
+
 type Expr interface {
 	Node
 	exprNode()
@@ -196,6 +259,19 @@ type ListOperatorExpr struct {
 }
 
 type ExistsFunctionName struct{}
+
+func (q *EmptyQuery) SetProjection(projection *Projection) {
+	q.Projection = projection
+}
+func (q *CreateQuery) SetProjection(projection *Projection) {
+	q.Projection = projection
+}
+func (q *MatchQuery) SetProjection(projection *Projection) {
+	q.Projection = projection
+}
+
+func (p *PatternElementPattern) patternElementNode() {}
+func (p *PatternElementNested) patternElementNode()  {}
 
 func (e *OpExpr) exprNode()                   {}
 func (e *UnaryExpr) exprNode()                {}
