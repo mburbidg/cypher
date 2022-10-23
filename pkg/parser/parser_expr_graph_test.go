@@ -20,7 +20,7 @@ func TestNodeLabels(t *testing.T) {
 	reporter := newTestReporter()
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			runTest(t, reporter, tc)
+			runExprTest(t, reporter, tc)
 		})
 	}
 }
@@ -37,7 +37,7 @@ func TestNodeEdgeLabels(t *testing.T) {
 	reporter := newTestReporter()
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			runTest(t, reporter, tc)
+			runExprTest(t, reporter, tc)
 		})
 	}
 }
@@ -53,7 +53,7 @@ func TestStaticPropertyAccess(t *testing.T) {
 	reporter := newTestReporter()
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			runTest(t, reporter, tc)
+			runExprTest(t, reporter, tc)
 		})
 	}
 }
@@ -70,7 +70,7 @@ func TestDynamicPropertyAccess(t *testing.T) {
 	reporter := newTestReporter()
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			runTest(t, reporter, tc)
+			runExprTest(t, reporter, tc)
 		})
 	}
 }
@@ -86,7 +86,7 @@ func TestPropertyKeyFunction(t *testing.T) {
 	reporter := newTestReporter()
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			runTest(t, reporter, tc)
+			runExprTest(t, reporter, tc)
 		})
 	}
 }
@@ -105,7 +105,7 @@ func TestRetrieveAsPropertyMap(t *testing.T) {
 	reporter := newTestReporter()
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			runTest(t, reporter, tc)
+			runExprTest(t, reporter, tc)
 		})
 	}
 }

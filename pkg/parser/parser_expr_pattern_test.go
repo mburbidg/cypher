@@ -37,7 +37,7 @@ func TestPatternPredicate(t *testing.T) {
 	reporter := newTestReporter()
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			runTest(t, reporter, tc)
+			runExprTest(t, reporter, tc)
 		})
 	}
 }
@@ -62,7 +62,7 @@ func TestPatternComprehension(t *testing.T) {
 	reporter := newTestReporter()
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			runTest(t, reporter, tc)
+			runExprTest(t, reporter, tc)
 		})
 	}
 }

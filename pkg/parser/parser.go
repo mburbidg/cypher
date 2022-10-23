@@ -67,6 +67,296 @@ func (p *Parser) matchPhrase(tokenTypes ...scanner.TokenType) ([]scanner.Token, 
 	}
 }
 
+func (p *Parser) singlePartQuery() (ast.Query, error) {
+	q, err := p.createQuery()
+	if err != nil {
+		return nil, err
+	}
+	projection, err := p.parseReturn()
+	if err != nil {
+		return nil, err
+	}
+	q.SetProjection(projection)
+	return q, nil
+}
+
+func (p *Parser) parseReturn() (*ast.Projection, error) {
+	if _, ok, err := p.match(scanner.Return); err != nil {
+		return nil, err
+	} else if !ok {
+		return nil, nil
+	}
+	projection, err := p.projectionBody()
+	if err != nil {
+		return nil, err
+	}
+	if projection == nil {
+		return nil, p.reporter.Error(p.scanner.Line(), "expecting projection following 'RETURN'")
+	}
+	return projection, nil
+}
+
+func (p *Parser) projectionBody() (*ast.Projection, error) {
+	distinct := false
+	if _, ok, err := p.match(scanner.Distinct); err != nil {
+		return nil, err
+	} else if ok {
+		distinct = true
+	}
+	items, err := p.projectionItems()
+	if err != nil {
+		return nil, err
+	}
+	order, err := p.order()
+	if err != nil {
+		return nil, err
+	}
+	skip, err := p.skip()
+	if err != nil {
+		return nil, err
+	}
+	limit, err := p.limit()
+	if err != nil {
+		return nil, err
+	}
+	return &ast.Projection{Distinct: distinct, Items: items, Order: order, Skip: skip, Limit: limit}, nil
+}
+
+func (p *Parser) projectionItems() (*ast.ProjectionItems, error) {
+	all := false
+	items := []*ast.ProjectionItem{}
+
+	// Parse '*' or first project item.
+	if _, ok, err := p.match(scanner.Star); err != nil {
+		return nil, err
+	} else if ok {
+		all = true
+	} else {
+		item, err := p.projectionItem()
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+
+	// One or more, comma separated projection items can follow.
+	for {
+		if _, ok, err := p.match(scanner.Comma); err != nil {
+			return nil, err
+		} else if !ok {
+			break
+		}
+		item, err := p.projectionItem()
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return &ast.ProjectionItems{All: all, Items: items}, nil
+}
+
+func (p *Parser) projectionItem() (*ast.ProjectionItem, error) {
+	expr, err := p.expr()
+	if err != nil {
+		return nil, err
+	}
+	if _, ok, err := p.match(scanner.As); err != nil {
+		return nil, err
+	} else if !ok {
+		return &ast.ProjectionItem{Expr: expr}, nil
+	}
+
+	// We receive an 'AS' token, so we expect a variable to follow.
+	variable, err := p.variable()
+	if err != nil {
+		return nil, err
+	} else if variable == nil {
+		return nil, p.reporter.Error(p.scanner.Line(), "expecting variable following 'AS'")
+	}
+	return &ast.ProjectionItem{Expr: expr, Variable: variable}, nil
+}
+
+func (p *Parser) order() ([]*ast.SortItem, error) {
+	if _, ok, err := p.matchPhrase(scanner.Order, scanner.By); err != nil {
+		return nil, err
+	} else if !ok {
+		return nil, nil
+	}
+	item, err := p.sortItem()
+	if err != nil {
+		return nil, err
+	}
+	if item == nil {
+		return nil, p.reporter.Error(p.scanner.Line(), "expecting sort expression following 'ORDER BY'")
+	}
+	items := []*ast.SortItem{item}
+	for {
+		if _, ok, err := p.match(scanner.Comma); err != nil {
+			return nil, err
+		} else if !ok {
+			return items, nil
+		}
+		item, err := p.sortItem()
+		if err != nil {
+			return nil, err
+		}
+		if item == nil {
+			return nil, p.reporter.Error(p.scanner.Line(), "expecting sort expression following ','")
+		}
+		items = append(items, item)
+	}
+}
+
+func (p *Parser) sortItem() (*ast.SortItem, error) {
+	expr, err := p.expr()
+	if err != nil {
+		return nil, err
+	}
+	if expr == nil {
+		return nil, p.reporter.Error(p.scanner.Line(), "expecting sort order expression after ',' or 'ORDER BY'")
+	}
+	var order ast.Order
+	if t, ok, err := p.match(scanner.Asc, scanner.Ascending, scanner.Desc, scanner.Descending); err != nil {
+		return nil, err
+	} else if ok {
+		switch t.T {
+		case scanner.Asc, scanner.Ascending:
+			order = ast.Asc
+		case scanner.Desc, scanner.Descending:
+			order = ast.Desc
+		}
+	}
+	return &ast.SortItem{Order: order, Expr: expr}, nil
+}
+
+func (p *Parser) skip() (ast.Expr, error) {
+	if _, ok, err := p.match(scanner.Skip); err != nil {
+		return nil, err
+	} else if !ok {
+		return nil, nil
+	}
+	expr, err := p.expr()
+	if err != nil {
+		return nil, err
+	}
+	return expr, nil
+}
+
+func (p *Parser) limit() (ast.Expr, error) {
+	if _, ok, err := p.match(scanner.Limit); err != nil {
+		return nil, err
+	} else if !ok {
+		return nil, nil
+	}
+	expr, err := p.expr()
+	if err != nil {
+		return nil, err
+	}
+	return expr, nil
+}
+
+func (p *Parser) createQuery() (ast.Query, error) {
+	if _, ok, err := p.match(scanner.Create); err != nil {
+		return nil, err
+	} else if !ok {
+		return nil, nil
+	}
+	pattern, err := p.pattern()
+	if err != nil {
+		return nil, err
+	}
+	return &ast.CreateQuery{Pattern: pattern}, nil
+}
+
+func (p *Parser) matchQuery() (ast.Query, error) {
+	return nil, nil
+}
+
+func (p *Parser) pattern() (*ast.Pattern, error) {
+	part, err := p.patternPart()
+	if err != nil {
+		return nil, err
+	}
+	parts := []*ast.PatternPart{part}
+	for {
+		if _, ok, err := p.match(scanner.Comma); err != nil {
+			return nil, err
+		} else if !ok {
+			break
+		}
+		part, err := p.patternPart()
+		if err != nil {
+			return nil, err
+		}
+		parts = append(parts, part)
+	}
+	return &ast.Pattern{Parts: parts}, nil
+}
+
+func (p *Parser) patternPart() (*ast.PatternPart, error) {
+	v, err := p.variable()
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle variable assignment pattern part
+	if v != nil {
+		if _, ok, err := p.match(scanner.Equal); err != nil {
+			return nil, err
+		} else if !ok {
+			return nil, p.reporter.Error(p.scanner.Line(), "expecting '=' following variable")
+		}
+	}
+
+	// Handle anonymous part
+	part, err := p.anonymousPatternPart()
+	if err != nil {
+		return nil, err
+	}
+	return &ast.PatternPart{Variable: v, Element: part}, nil
+}
+
+func (p *Parser) anonymousPatternPart() (ast.PatternElement, error) {
+	return p.patternElement()
+}
+
+func (p *Parser) patternElement() (ast.PatternElement, error) {
+	node, err := p.nodePattern()
+	if err != nil {
+		return nil, err
+	}
+
+	// First handle the nested PatternElement production
+	if node == nil {
+		if _, ok, err := p.match(scanner.OpenParen); err != nil {
+			return nil, err
+		} else if ok {
+			element, err := p.patternElement()
+			if err != nil {
+				return nil, err
+			} else if element == nil {
+				return nil, p.reporter.Error(p.scanner.Line(), "expecting nested pattern element")
+			}
+			return &ast.PatternElementNested{Element: element}, nil
+		} else {
+			return nil, p.reporter.Error(p.scanner.Line(), "expecting pattern element")
+		}
+	}
+
+	// Else handle the chained PatternElement production
+	chainList := []*ast.PatternElementChain{}
+	for {
+		chain, err := p.patternElementChain()
+		if err != nil {
+			return nil, err
+		} else if chain == nil {
+			break
+		}
+		chainList = append(chainList, chain)
+	}
+	return &ast.PatternElementPattern{Left: node, Chain: chainList}, nil
+}
+
 func (p *Parser) expr() (ast.Expr, error) {
 	return p.orExpr()
 }

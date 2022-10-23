@@ -18,7 +18,7 @@ func TestCoalesce(t *testing.T) {
 	reporter := newTestReporter()
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			runTest(t, reporter, tc)
+			runExprTest(t, reporter, tc)
 		})
 	}
 }
@@ -42,7 +42,7 @@ func TestCase(t *testing.T) {
 	reporter := newTestReporter()
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			runTest(t, reporter, tc)
+			runExprTest(t, reporter, tc)
 		})
 	}
 }

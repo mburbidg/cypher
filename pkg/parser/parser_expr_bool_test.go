@@ -37,7 +37,7 @@ func TestAndLogical(t *testing.T) {
 	reporter := newTestReporter()
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			runTest(t, reporter, tc)
+			runExprTest(t, reporter, tc)
 		})
 	}
 }
@@ -70,7 +70,7 @@ func TestOrLogical(t *testing.T) {
 	reporter := newTestReporter()
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			runTest(t, reporter, tc)
+			runExprTest(t, reporter, tc)
 		})
 	}
 }
@@ -103,7 +103,7 @@ func TestXorLogical(t *testing.T) {
 	reporter := newTestReporter()
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			runTest(t, reporter, tc)
+			runExprTest(t, reporter, tc)
 		})
 	}
 }

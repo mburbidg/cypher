@@ -24,7 +24,7 @@ func TestStringPrefixMatch(t *testing.T) {
 	reporter := newTestReporter()
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			runTest(t, reporter, tc)
+			runExprTest(t, reporter, tc)
 		})
 	}
 }
@@ -46,7 +46,7 @@ func TestStringSuffixMatch(t *testing.T) {
 	reporter := newTestReporter()
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			runTest(t, reporter, tc)
+			runExprTest(t, reporter, tc)
 		})
 	}
 }
@@ -68,7 +68,7 @@ func TestSubstringMatch(t *testing.T) {
 	reporter := newTestReporter()
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			runTest(t, reporter, tc)
+			runExprTest(t, reporter, tc)
 		})
 	}
 }
@@ -85,7 +85,7 @@ func TestStringMatch(t *testing.T) {
 	reporter := newTestReporter()
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			runTest(t, reporter, tc)
+			runExprTest(t, reporter, tc)
 		})
 	}
 }
