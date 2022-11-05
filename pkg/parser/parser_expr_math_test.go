@@ -15,7 +15,7 @@ func TestAdditionExpr(t *testing.T) {
 	reporter := newTestReporter()
 	s := scanner.New([]byte("g.id = 1337"), reporter)
 	p := New(s, reporter)
-	tree, err := p.Parse()
+	tree, err := p.expr()
 	assert.NoError(t, err)
 	assert.Equal(t, "g", tree.(*ast.BinaryExpr).Left.(*ast.PropertyLabelsExpr).Atom.(*ast.VariableExpr).SymbolicName.(*ast.SymbolicNameIdentifier).Identifier.Lexeme)
 	assert.Equal(t, 1, len(tree.(*ast.BinaryExpr).Left.(*ast.PropertyLabelsExpr).PropertyKeys))
@@ -25,7 +25,7 @@ func TestAdditionExpr(t *testing.T) {
 
 	s = scanner.New([]byte("g.version + 5"), reporter)
 	p = New(s, reporter)
-	tree, err = p.Parse()
+	tree, err = p.expr()
 	assert.NoError(t, err)
 	assert.Equal(t, "g", tree.(*ast.BinaryExpr).Left.(*ast.PropertyLabelsExpr).Atom.(*ast.VariableExpr).SymbolicName.(*ast.SymbolicNameIdentifier).Identifier.Lexeme)
 	assert.Equal(t, 1, len(tree.(*ast.BinaryExpr).Left.(*ast.PropertyLabelsExpr).PropertyKeys))
@@ -48,7 +48,7 @@ func TestMathematicalPrecedence(t *testing.T) {
 	reporter := newTestReporter()
 	s := scanner.New([]byte("12 / 4 * 3 - 2 * 4"), reporter)
 	p := New(s, reporter)
-	tree, err := p.Parse()
+	tree, err := p.expr()
 	assert.NoError(t, err)
 	assert.Equal(t, int64(12), tree.(*ast.BinaryExpr).Left.(*ast.BinaryExpr).Left.(*ast.BinaryExpr).Left.(*ast.PropertyLabelsExpr).Atom.(*ast.PrimitiveLiteral).Value.(int64))
 	assert.Equal(t, ast.Divide, tree.(*ast.BinaryExpr).Left.(*ast.BinaryExpr).Left.(*ast.BinaryExpr).Op)
@@ -61,7 +61,7 @@ func TestMathematicalPrecedence(t *testing.T) {
 
 	s = scanner.New([]byte("12 / 4 * (3 - 2 * 4)"), reporter)
 	p = New(s, reporter)
-	tree, err = p.Parse()
+	tree, err = p.expr()
 	assert.NoError(t, err)
 	assert.Equal(t, int64(12), tree.(*ast.BinaryExpr).Left.(*ast.BinaryExpr).Left.(*ast.PropertyLabelsExpr).Atom.(*ast.PrimitiveLiteral).Value.(int64))
 	assert.Equal(t, ast.Divide, tree.(*ast.BinaryExpr).Left.(*ast.BinaryExpr).Op)
@@ -79,7 +79,7 @@ func TestAbsoluteFunction(t *testing.T) {
 	reporter := newTestReporter()
 	s := scanner.New([]byte("abs(-1)"), reporter)
 	p := New(s, reporter)
-	tree, err := p.Parse()
+	tree, err := p.expr()
 	assert.NoError(t, err)
 	name := tree.(*ast.PropertyLabelsExpr).Atom.(*ast.FunctionInvocation).FunctionName.(*ast.SymbolicFunctionName).FunctionName.(*ast.SymbolicNameIdentifier).Identifier.Lexeme
 	assert.Equal(t, "abs", name)
@@ -94,7 +94,7 @@ func TestReturningFloatValues(t *testing.T) {
 	reporter := newTestReporter()
 	s := scanner.New([]byte("sqrt(12.96)"), reporter)
 	p := New(s, reporter)
-	tree, err := p.Parse()
+	tree, err := p.expr()
 	assert.NoError(t, err)
 	name := tree.(*ast.PropertyLabelsExpr).Atom.(*ast.FunctionInvocation).FunctionName.(*ast.SymbolicFunctionName).FunctionName.(*ast.SymbolicNameIdentifier).Identifier.Lexeme
 	assert.Equal(t, "sqrt", name)

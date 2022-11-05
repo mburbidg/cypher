@@ -27,7 +27,7 @@ func TestDynamicElementAccess(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			s := scanner.New([]byte(tc.src), reporter)
 			p := New(s, reporter)
-			tree, err := p.Parse()
+			tree, err := p.expr()
 			if tc.valid {
 				assert.NoError(t, err)
 				assert.NotNil(t, tree)

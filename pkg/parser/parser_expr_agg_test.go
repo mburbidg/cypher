@@ -22,7 +22,7 @@ func TestAggrecationCount(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			s := scanner.New([]byte(tc.src), reporter)
 			p := New(s, reporter)
-			tree, err := p.Parse()
+			tree, err := p.expr()
 			assert.NoError(t, err)
 			assert.NotNil(t, tree)
 		})
@@ -48,7 +48,7 @@ func TestAggrecationMinMax(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			s := scanner.New([]byte(tc.src), reporter)
 			p := New(s, reporter)
-			tree, err := p.Parse()
+			tree, err := p.expr()
 			assert.NoError(t, err)
 			assert.NotNil(t, tree)
 		})
@@ -68,7 +68,7 @@ func TestAggrecationSum(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			s := scanner.New([]byte(tc.src), reporter)
 			p := New(s, reporter)
-			tree, err := p.Parse()
+			tree, err := p.expr()
 			assert.NoError(t, err)
 			assert.NotNil(t, tree)
 		})
@@ -88,7 +88,7 @@ func TestAggrecationCollect(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			s := scanner.New([]byte(tc.src), reporter)
 			p := New(s, reporter)
-			tree, err := p.Parse()
+			tree, err := p.expr()
 			assert.NoError(t, err)
 			assert.NotNil(t, tree)
 		})
@@ -108,7 +108,7 @@ func TestAggrecationPercentiles(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			s := scanner.New([]byte(tc.src), reporter)
 			p := New(s, reporter)
-			tree, err := p.Parse()
+			tree, err := p.expr()
 			assert.NoError(t, err)
 			assert.NotNil(t, tree)
 		})
@@ -128,7 +128,7 @@ func TestAggrecationDistinct(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			s := scanner.New([]byte(tc.src), reporter)
 			p := New(s, reporter)
-			tree, err := p.Parse()
+			tree, err := p.expr()
 			assert.NoError(t, err)
 			assert.NotNil(t, tree)
 		})
