@@ -20,8 +20,8 @@ func New(scanner *scanner.Scanner, reporter utils.Reporter) *Parser {
 	}
 }
 
-func (p *Parser) Parse() (ast.Expr, error) {
-	return p.expr()
+func (p *Parser) Parse() (ast.Query, error) {
+	return p.singlePartQuery()
 }
 
 func (p *Parser) match(tokenTypes ...scanner.TokenType) (scanner.Token, bool, error) {
