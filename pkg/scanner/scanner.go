@@ -34,6 +34,10 @@ func New(src []byte, reporter utils.Reporter) *Scanner {
 	}
 }
 
+func (s *Scanner) String() string {
+	return string(s.src)
+}
+
 func (s *Scanner) next() rune {
 	if s.Position.offset < len(s.src) {
 		r, w := utf8.DecodeRune(s.src[s.Position.offset:])
