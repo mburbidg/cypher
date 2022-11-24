@@ -13,6 +13,14 @@ type Parser struct {
 	reporter utils.Reporter
 }
 
+type Statement struct {
+	// The abstract syntax tree (AST) for the parser cypher query.
+	AST ast.Query
+
+	// The cypher query.
+	Cypher string
+}
+
 func New(scanner *scanner.Scanner, reporter utils.Reporter) *Parser {
 	return &Parser{
 		scanner:  scanner,
@@ -20,8 +28,15 @@ func New(scanner *scanner.Scanner, reporter utils.Reporter) *Parser {
 	}
 }
 
-func (p *Parser) Parse() (ast.Query, error) {
-	return p.singlePartQuery()
+func (p *Parser) Parse() (Statement, error) {
+	tree, err := p.singlePartQuery()
+	if err != nil {
+		return Statement{}, err
+	}
+	return Statement{
+		AST:    tree,
+		Cypher: p.scanner.String(),
+	}, nil
 }
 
 func (p *Parser) match(tokenTypes ...scanner.TokenType) (scanner.Token, bool, error) {
