@@ -1,8 +1,8 @@
 package parser
 
 import (
-	"github.com/mburbidg/cypher/pkg/ast"
-	"github.com/mburbidg/cypher/pkg/scanner"
+	"github.com/mburbidg/cypher/ast"
+	"github.com/mburbidg/cypher/scanner"
 )
 
 var opForTokens = map[scanner.TokenType]ast.Operator{

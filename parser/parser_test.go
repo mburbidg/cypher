@@ -1,8 +1,8 @@
 package parser
 
 import (
-	"github.com/mburbidg/cypher/pkg/scanner"
-	"github.com/mburbidg/cypher/pkg/utils"
+	scanner2 "github.com/mburbidg/cypher/scanner"
+	"github.com/mburbidg/cypher/utils"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -32,12 +32,12 @@ func (r *testReporter) Error(line int, msg string) error {
 
 func TestMatchPhrase(t *testing.T) {
 	reporter := newTestReporter()
-	s := scanner.New([]byte("COUNT(*)"), reporter)
+	s := scanner2.New([]byte("COUNT(*)"), reporter)
 	p := New(s, reporter)
-	_, ok, err := p.matchPhrase(scanner.Identifier, scanner.OpenParen, scanner.Colon, scanner.CloseParen, scanner.EndOfInput)
+	_, ok, err := p.matchPhrase(scanner2.Identifier, scanner2.OpenParen, scanner2.Colon, scanner2.CloseParen, scanner2.EndOfInput)
 	assert.NoError(t, err)
 	assert.False(t, ok)
-	_, ok, err = p.matchPhrase(scanner.Identifier, scanner.OpenParen, scanner.Star, scanner.CloseParen, scanner.EndOfInput)
+	_, ok, err = p.matchPhrase(scanner2.Identifier, scanner2.OpenParen, scanner2.Star, scanner2.CloseParen, scanner2.EndOfInput)
 	assert.NoError(t, err)
 	assert.True(t, ok)
 }

@@ -1,6 +1,8 @@
 package ast
 
-import "github.com/mburbidg/cypher/pkg/scanner"
+import (
+	scanner2 "github.com/mburbidg/cypher/scanner"
+)
 
 type Node interface {
 }
@@ -122,7 +124,7 @@ type SymbolicNameSchemaName struct {
 }
 
 type ReservedWordSchemaName struct {
-	TokenType scanner.TokenType
+	TokenType scanner2.TokenType
 }
 
 type SymbolicName interface {
@@ -130,7 +132,7 @@ type SymbolicName interface {
 }
 
 type SymbolicNameIdentifier struct {
-	Identifier scanner.Token
+	Identifier scanner2.Token
 	Type       SymbolType
 }
 
@@ -139,14 +141,14 @@ type SymbolicNameHexLetter struct {
 }
 
 type ReservedWord struct {
-	Token scanner.Token
+	Token scanner2.Token
 }
 
 type Label struct {
 }
 
 type PrimitiveLiteral struct {
-	Kind  scanner.TokenType
+	Kind  scanner2.TokenType
 	Value interface{}
 }
 
@@ -156,7 +158,7 @@ type ListLiteral struct {
 
 type Parameter struct {
 	SymbolicName SymbolicName
-	N            *scanner.Token
+	N            *scanner2.Token
 }
 
 type CaseExpr struct {

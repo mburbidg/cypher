@@ -2,7 +2,7 @@ package scanner
 
 import (
 	"fmt"
-	"github.com/mburbidg/cypher/pkg/utils"
+	"github.com/mburbidg/cypher/utils"
 	"github.com/smasher164/xid"
 	"strings"
 	"unicode"

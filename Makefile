@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := test
 
 test:
-	go test -v github.com/mburbidg/cypher/pkg/scanner
-	go test -v github.com/mburbidg/cypher/pkg/parser
+	go test -v github.com/mburbidg/cypher/scanner
+	go test -v github.com/mburbidg/cypher/parser
 .PHONY:test

@@ -1,7 +1,7 @@
 package scanner
 
 import (
-	"github.com/mburbidg/cypher/pkg/utils"
+	"github.com/mburbidg/cypher/utils"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

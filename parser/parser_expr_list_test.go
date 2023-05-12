@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"github.com/mburbidg/cypher/pkg/scanner"
+	"github.com/mburbidg/cypher/scanner"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
