@@ -80,7 +80,7 @@ func (g *graphFeature) theSideEffectsShouldBe(ctx context.Context, values *godog
 }
 
 func (g *graphFeature) syntaxErrorRaised(ctx context.Context, errStr string) (context.Context, error) {
-	if _, ok := ctx.Value(syntaxErrKey{}).(string); ok {
+	if _, ok := ctx.Value(syntaxErrKey{}).(error); ok {
 		return ctx, nil
 	}
 	return ctx, fmt.Errorf("expecting syntax error: %s", errStr)
