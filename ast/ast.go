@@ -12,17 +12,27 @@ type Query interface {
 	queryNode()
 }
 
+type ReadingClause interface {
+	Node
+	readingClauseNode()
+}
+
+type UpdatingClause interface {
+	Node
+	updatingClauseNode()
+}
+
 type SinglePartQuery struct {
-	ReadingClause  []Query
-	UpdatingClause []Query
+	ReadingClause  []ReadingClause
+	UpdatingClause []UpdatingClause
 	*Projection
 }
 
-type CreateQuery struct {
+type CreateClause struct {
 	Pattern *Pattern
 }
 
-type MatchQuery struct {
+type MatchClause struct {
 	Optional  bool
 	Pattern   *Pattern
 	WhereExpr Expr
@@ -46,7 +56,7 @@ type PatternElementPattern struct {
 }
 
 type PatternPart struct {
-	Variable Expr
+	Variable SymbolicName
 	Element  PatternElement
 }
 
@@ -65,7 +75,7 @@ type ProjectionItems struct {
 
 type ProjectionItem struct {
 	Expr     Expr
-	Variable Expr
+	Variable SymbolicName
 }
 
 type SortItem struct {
@@ -178,7 +188,7 @@ type QuantifierExpr struct {
 }
 
 type FilterExpr struct {
-	Variable  Expr
+	Variable  SymbolicName
 	InExpr    Expr
 	WhereExpr Expr
 }
@@ -188,14 +198,14 @@ type VariableExpr struct {
 }
 
 type PatternComprehensionExpr struct {
-	Variable            Expr
+	Variable            SymbolicName
 	ReltionshipsPattern Expr
 	WhereExpr           Expr
 	PipeExpr            Expr
 }
 
 type NodePattern struct {
-	Variable   Expr
+	Variable   SymbolicName
 	Labels     []SchemaName
 	Properties *Properties
 }
@@ -231,7 +241,7 @@ type RelationshipPattern struct {
 }
 
 type RelationshipDetail struct {
-	Variable          Expr
+	Variable          SymbolicName
 	RelationshipTypes []SchemaName
 	RangeLiteral      *RangeLiteral
 	Properties        *Properties
@@ -265,9 +275,9 @@ type ListOperatorExpr struct {
 
 type ExistsFunctionName struct{}
 
-func (q *SinglePartQuery) queryNode() {}
-func (q *CreateQuery) queryNode()     {}
-func (q *MatchQuery) queryNode()      {}
+func (q *SinglePartQuery) queryNode()       {}
+func (q *CreateClause) updatingClauseNode() {}
+func (q *MatchClause) readingClauseNode()   {}
 
 func (p *PatternElementPattern) patternElementNode() {}
 func (p *PatternElementNested) patternElementNode()  {}
