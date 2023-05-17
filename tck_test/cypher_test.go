@@ -37,21 +37,38 @@ func (g *graphFeature) anEmptyGraph(ctx context.Context) (context.Context, error
 }
 
 func (g *graphFeature) executingQuery(ctx context.Context, query *godog.DocString) (context.Context, error) {
-	//session := ctx.Value(sessionCtxKey{}).(neo4j.SessionWithContext)
-	//result, err := session.Run(ctx, query.Content, map[string]any{})
-	//if err != nil {
-	//	if err, ok := err.(*db.Neo4jError); ok {
-	//		if err.Code == "Neo.ClientError.Statement.SyntaxError" {
-	//			ctx = context.WithValue(ctx, syntaxErrorMsgKey{}, err.Msg)
-	//		} else {
-	//			return ctx, err
-	//		}
-	//	} else {
-	//		return ctx, err
-	//	}
-	//}
-	//return context.WithValue(ctx, resultCtxKey{}, result), nil
+	reporter := &reporter{}
+	s := scanner.New([]byte(query.Content), reporter)
+	p := parser.New(s, reporter)
+	r := &astRuntime{}
+	stmt, err := p.Parse()
+	if err != nil {
+		return context.WithValue(ctx, syntaxErrKey{}, err), nil
+	}
+	err = r.eval(stmt)
+	if err != nil {
+		return context.WithValue(ctx, syntaxErrKey{}, err), nil
+	}
+	return ctx, nil
+}
 
+func (g *graphFeature) executingControlQuery(ctx context.Context, query *godog.DocString) (context.Context, error) {
+	reporter := &reporter{}
+	s := scanner.New([]byte(query.Content), reporter)
+	p := parser.New(s, reporter)
+	r := &astRuntime{}
+	stmt, err := p.Parse()
+	if err != nil {
+		return context.WithValue(ctx, syntaxErrKey{}, err), nil
+	}
+	err = r.eval(stmt)
+	if err != nil {
+		return context.WithValue(ctx, syntaxErrKey{}, err), nil
+	}
+	return ctx, nil
+}
+
+func (g *graphFeature) havingExecutedQuery(ctx context.Context, query *godog.DocString) (context.Context, error) {
 	reporter := &reporter{}
 	s := scanner.New([]byte(query.Content), reporter)
 	p := parser.New(s, reporter)
@@ -90,8 +107,11 @@ func TestCypherFeatures(t *testing.T) {
 	suite := godog.TestSuite{
 		ScenarioInitializer: InitializeCypherScenario,
 		Options: &godog.Options{
-			Format:   "pretty",
-			Paths:    []string{"tck/features/clauses/create/Create1.feature"},
+			Format: "pretty",
+			Paths: []string{
+				"tck/features/clauses/create/Create1.feature",
+				"tck/features/clauses/create/Create2.feature",
+			},
 			TestingT: t,
 		},
 	}
@@ -112,6 +132,9 @@ func InitializeCypherScenario(sc *godog.ScenarioContext) {
 	sc.Step(`^the result should be, in any order:$`, g.theResultShouldBeInAnyOrder)
 	sc.Step(`^the side effects should be:$`, g.theSideEffectsShouldBe)
 	sc.Step(`^a SyntaxError should be raised at compile time: ([a-zA-Z]+)$`, g.syntaxErrorRaised)
+	sc.Step(`^executing control query:$`, g.executingControlQuery)
+	sc.Step(`^having executed:$`, g.havingExecutedQuery)
+
 }
 
 func TestMain(m *testing.M) {

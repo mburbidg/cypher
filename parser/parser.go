@@ -1473,6 +1473,7 @@ func (p *Parser) relationshipTypes() ([]ast.SchemaName, error) {
 		if s == nil {
 			return nil, p.reporter.Error(p.scanner.Line(), "expecting relationship type name")
 		}
+		typeNames = append(typeNames, s)
 	}
 }
 
