@@ -8,6 +8,7 @@ const (
 	NoSingleRelationshipType     = "NoSingleRelationshipType"
 	RequiresDirectedRelationship = "RequiresDirectedRelationship"
 	CreatingVarLength            = "CreatingVarLength"
+	InvalidParameterUse          = "InvalidParameterUse"
 )
 
 type CypherErr struct {
@@ -50,6 +51,13 @@ func NewRequiresDirectedRelationship() error {
 func NewCreatingVarLength() error {
 	return &CypherErr{
 		Msg:  fmt.Sprintf("creating variable-length relationship"),
+		Code: CreatingVarLength,
+	}
+}
+
+func NewInvalidParameterUse() error {
+	return &CypherErr{
+		Msg:  fmt.Sprintf("invalid parameter use"),
 		Code: CreatingVarLength,
 	}
 }
