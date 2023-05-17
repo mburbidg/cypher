@@ -96,6 +96,10 @@ func (g *graphFeature) theSideEffectsShouldBe(ctx context.Context, values *godog
 	return ctx, nil
 }
 
+func (g *graphFeature) noSideEffects(ctx context.Context) (context.Context, error) {
+	return ctx, nil
+}
+
 func (g *graphFeature) syntaxErrorRaised(ctx context.Context, errStr string) (context.Context, error) {
 	if _, ok := ctx.Value(syntaxErrKey{}).(error); ok {
 		return ctx, nil
@@ -110,6 +114,7 @@ func TestCypherFeatures(t *testing.T) {
 			Format: "pretty",
 			Paths: []string{
 				"tck/features/clauses/create",
+				"tck/features/clauses/match/Match1.feature",
 			},
 			TestingT: t,
 		},
@@ -130,6 +135,7 @@ func InitializeCypherScenario(sc *godog.ScenarioContext) {
 	sc.Step(`^the result should be empty$`, g.theResultShouldBeEmpty)
 	sc.Step(`^the result should be, in any order:$`, g.theResultShouldBeInAnyOrder)
 	sc.Step(`^the side effects should be:$`, g.theSideEffectsShouldBe)
+	sc.Step(`^no side effects$`, g.noSideEffects)
 	sc.Step(`^a SyntaxError should be raised at compile time: ([a-zA-Z]+)$`, g.syntaxErrorRaised)
 	sc.Step(`^executing control query:$`, g.executingControlQuery)
 	sc.Step(`^having executed:$`, g.havingExecutedQuery)

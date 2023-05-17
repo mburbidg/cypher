@@ -10,19 +10,26 @@ import (
 )
 
 const (
-	readingClause int = iota
+	none int = iota
+	readingClause
 	updatingClause
+	matchClause
+	createClause
 )
 
 type scope struct {
-	symbolTable map[string]any
-	prev        *scope
+	clauseType   int
+	clauseDetail int
+	symbolTable  map[string]any
+	prev         *scope
 }
 
 func newScope(prev *scope) *scope {
 	return &scope{
-		symbolTable: map[string]any{},
-		prev:        prev,
+		clauseType:   none,
+		clauseDetail: none,
+		symbolTable:  map[string]any{},
+		prev:         prev,
 	}
 }
 
@@ -35,6 +42,26 @@ func (s *scope) popScope() (*scope, bool) {
 		return nil, false
 	}
 	return s.prev, true
+}
+
+func (s *scope) getClauseType() int {
+	if s.clauseType != none {
+		return s.clauseType
+	}
+	if s.prev != nil {
+		return s.prev.getClauseType()
+	}
+	return none
+}
+
+func (s *scope) getClauseDetail() int {
+	if s.clauseDetail != none {
+		return s.clauseDetail
+	}
+	if s.prev != nil {
+		return s.prev.getClauseDetail()
+	}
+	return none
 }
 
 type astRuntime struct {
@@ -52,11 +79,11 @@ func (runtime *astRuntime) eval(stmt parser.Statement) error {
 
 func (runtime *astRuntime) evalSinglePartQuery(scope *scope, tree *ast.SinglePartQuery) error {
 	log.Printf("evaluating single part query")
-	err := runtime.evalReadingClause(scope, readingClause, tree.ReadingClause)
+	err := runtime.evalReadingClause(scope, tree.ReadingClause)
 	if err != nil {
 		return err
 	}
-	err = runtime.evalUpdatingClause(scope, updatingClause, tree.UpdatingClause)
+	err = runtime.evalUpdatingClause(scope, tree.UpdatingClause)
 	if err != nil {
 		return err
 	}
@@ -67,12 +94,13 @@ func (runtime *astRuntime) evalSinglePartQuery(scope *scope, tree *ast.SinglePar
 	return nil
 }
 
-func (runtime *astRuntime) evalReadingClause(scope *scope, clauseType int, tree []ast.ReadingClause) error {
+func (runtime *astRuntime) evalReadingClause(scope *scope, tree []ast.ReadingClause) error {
 	log.Printf("evaluating reading clause")
+	scope.clauseType = readingClause
 	for _, clause := range tree {
 		switch c := clause.(type) {
 		case *ast.MatchClause:
-			err := runtime.evalMatchClause(scope, clauseType, c)
+			err := runtime.evalMatchClause(scope, c)
 			if err != nil {
 				return err
 			}
@@ -81,12 +109,13 @@ func (runtime *astRuntime) evalReadingClause(scope *scope, clauseType int, tree 
 	return nil
 }
 
-func (runtime *astRuntime) evalUpdatingClause(scope *scope, clauseType int, tree []ast.UpdatingClause) error {
+func (runtime *astRuntime) evalUpdatingClause(scope *scope, tree []ast.UpdatingClause) error {
 	log.Printf("evaluating updating clause")
+	scope.clauseType = updatingClause
 	for _, clause := range tree {
 		switch c := clause.(type) {
 		case *ast.CreateClause:
-			err := runtime.evalCreateClause(scope, clauseType, c)
+			err := runtime.evalCreateClause(scope, c)
 			if err != nil {
 				return err
 			}
@@ -95,10 +124,11 @@ func (runtime *astRuntime) evalUpdatingClause(scope *scope, clauseType int, tree
 	return nil
 }
 
-func (runtime *astRuntime) evalMatchClause(scope *scope, clauseType int, tree *ast.MatchClause) error {
+func (runtime *astRuntime) evalMatchClause(scope *scope, tree *ast.MatchClause) error {
 	log.Printf("evaluating match clause")
+	scope.clauseDetail = matchClause
 	for _, p := range tree.Pattern.Parts {
-		err := runtime.evalPatternPart(scope, clauseType, p)
+		err := runtime.evalPatternPart(scope, p)
 		if err != nil {
 			return err
 		}
@@ -106,10 +136,11 @@ func (runtime *astRuntime) evalMatchClause(scope *scope, clauseType int, tree *a
 	return nil
 }
 
-func (runtime *astRuntime) evalCreateClause(scope *scope, clauseType int, tree *ast.CreateClause) error {
+func (runtime *astRuntime) evalCreateClause(scope *scope, tree *ast.CreateClause) error {
 	log.Printf("evaluating create clause")
+	scope.clauseDetail = createClause
 	for _, p := range tree.Pattern.Parts {
-		err := runtime.evalPatternPart(scope, clauseType, p)
+		err := runtime.evalPatternPart(scope, p)
 		if err != nil {
 			return err
 		}
@@ -117,87 +148,94 @@ func (runtime *astRuntime) evalCreateClause(scope *scope, clauseType int, tree *
 	return nil
 }
 
-func (runtime *astRuntime) evalPatternPart(scope *scope, clauseType int, part *ast.PatternPart) error {
+func (runtime *astRuntime) evalPatternPart(scope *scope, part *ast.PatternPart) error {
 	log.Printf("evaluating pattern part")
 	if err := runtime.bindVariable(scope, part.Variable); err != nil {
 		return err
 	}
-	return runtime.evalPatternElement(scope, clauseType, part.Element)
+	return runtime.evalPatternElement(scope, part.Element)
 }
 
-func (runtime *astRuntime) evalPatternElement(scope *scope, clauseType int, elem ast.PatternElement) error {
+func (runtime *astRuntime) evalPatternElement(scope *scope, elem ast.PatternElement) error {
 	switch elem := elem.(type) {
 	case *ast.PatternElementPattern:
-		err := runtime.evalPatternElementPattern(scope, clauseType, elem)
+		err := runtime.evalPatternElementPattern(scope, elem)
 		if err != nil {
 			return err
 		}
 	case *ast.PatternElementNested:
-		return runtime.evalPatternElement(scope, clauseType, elem.Element)
+		return runtime.evalPatternElement(scope, elem.Element)
 	default:
 		return fmt.Errorf("pattern element type not implemented")
 	}
 	return nil
 }
 
-func (runtime *astRuntime) evalPatternElementPattern(scope *scope, clauseType int, elem *ast.PatternElementPattern) error {
+func (runtime *astRuntime) evalPatternElementPattern(scope *scope, elem *ast.PatternElementPattern) error {
 	log.Printf("evaluating pattern element pattern")
-	if err := runtime.evalNodePattern(scope, clauseType, elem.Left); err != nil {
+	if err := runtime.evalNodePattern(scope, elem.Left); err != nil {
 		return err
 	}
 	for _, c := range elem.Chain {
-		if err := runtime.evalPatternElementChain(scope, clauseType, c); err != nil {
+		if err := runtime.evalPatternElementChain(scope, c); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (runtime *astRuntime) evalPatternElementChain(scope *scope, clauseType int, chain *ast.PatternElementChain) error {
-	if err := runtime.evalRelationshipPattern(scope, clauseType, chain.RelationshipPattern); err != nil {
+func (runtime *astRuntime) evalPatternElementChain(scope *scope, chain *ast.PatternElementChain) error {
+	if err := runtime.evalRelationshipPattern(scope, chain.RelationshipPattern); err != nil {
 		return err
 	}
-	if err := runtime.evalNodePattern(scope, clauseType, chain.Right); err != nil {
+	if err := runtime.evalNodePattern(scope, chain.Right); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (runtime *astRuntime) evalNodePattern(scope *scope, clauseType int, pattern *ast.NodePattern) error {
+func (runtime *astRuntime) evalNodePattern(scope *scope, pattern *ast.NodePattern) error {
 	if pattern != nil {
 		if err := runtime.bindVariable(scope, pattern.Variable); err != nil {
 			return err
 		}
-		if err := runtime.evalProperties(scope, clauseType, pattern.Properties); err != nil {
+		if err := runtime.evalProperties(scope, pattern.Properties); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (runtime *astRuntime) evalProperties(scope *scope, clauseType int, properties *ast.Properties) error {
+func (runtime *astRuntime) evalProperties(scope *scope, properties *ast.Properties) error {
 	if properties != nil {
-		if err := runtime.evalExpr(scope, clauseType, properties.Parameter); err != nil {
-			return err
+		if properties.Parameter != nil {
+			if scope.getClauseDetail() == matchClause {
+				return cypher.NewInvalidParameterUse()
+			}
+			if err := runtime.evalExpr(scope, properties.Parameter); err != nil {
+				return err
+			}
 		}
-		if err := runtime.evalExpr(scope, clauseType, properties.MapLiteral); err != nil {
-			return err
+		if properties.MapLiteral != nil {
+			if err := runtime.evalExpr(scope, properties.MapLiteral); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-func (runtime *astRuntime) evalMapLiteral(scope *scope, clauseType int, literal *ast.MapLiteral) error {
+func (runtime *astRuntime) evalMapLiteral(scope *scope, literal *ast.MapLiteral) error {
 	for _, p := range literal.PropertyKeyNames {
-		if err := runtime.evalExpr(scope, clauseType, p.Expr); err != nil {
+		if err := runtime.evalExpr(scope, p.Expr); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (runtime *astRuntime) evalRelationshipPattern(scope *scope, clauseType int, pattern *ast.RelationshipPattern) error {
-	if clauseType == updatingClause {
+func (runtime *astRuntime) evalRelationshipPattern(scope *scope, pattern *ast.RelationshipPattern) error {
+	if scope.getClauseType() == updatingClause {
 		if pattern.Right == ast.Undirected && pattern.Left == ast.Undirected {
 			return cypher.NewRequiresDirectedRelationship()
 		}
@@ -240,92 +278,92 @@ func (runtime *astRuntime) evalProjectionItem(scope *scope, clauseType int, item
 	if err := runtime.bindVariable(scope, item.Variable); err != nil {
 		return err
 	}
-	if err := runtime.evalExpr(scope, clauseType, item.Expr); err != nil {
+	if err := runtime.evalExpr(scope, item.Expr); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (runtime *astRuntime) evalExpr(scope *scope, clauseType int, expr ast.Expr) error {
+func (runtime *astRuntime) evalExpr(scope *scope, expr ast.Expr) error {
 	switch e := expr.(type) {
 	case *ast.OpExpr:
 	case *ast.UnaryExpr:
-		return runtime.evalExpr(scope, clauseType, e.Expr)
+		return runtime.evalExpr(scope, e.Expr)
 	case *ast.BinaryExpr:
-		if err := runtime.evalExpr(scope, clauseType, e.Left); err != nil {
+		if err := runtime.evalExpr(scope, e.Left); err != nil {
 			return err
 		}
-		if err := runtime.evalExpr(scope, clauseType, e.Right); err != nil {
+		if err := runtime.evalExpr(scope, e.Right); err != nil {
 			return err
 		}
 	case *ast.TernaryExpr:
-		if err := runtime.evalExpr(scope, clauseType, e.E1); err != nil {
+		if err := runtime.evalExpr(scope, e.E1); err != nil {
 			return err
 		}
-		if err := runtime.evalExpr(scope, clauseType, e.E2); err != nil {
+		if err := runtime.evalExpr(scope, e.E2); err != nil {
 			return err
 		}
-		if err := runtime.evalExpr(scope, clauseType, e.E3); err != nil {
+		if err := runtime.evalExpr(scope, e.E3); err != nil {
 			return err
 		}
 	case *ast.ListExpr:
 		for _, e := range e.List {
-			if err := runtime.evalExpr(scope, clauseType, e); err != nil {
+			if err := runtime.evalExpr(scope, e); err != nil {
 				return err
 			}
 		}
 	case *ast.PrimitiveLiteral:
 	case *ast.ListLiteral:
 		for _, e := range e.Items {
-			if err := runtime.evalExpr(scope, clauseType, e); err != nil {
+			if err := runtime.evalExpr(scope, e); err != nil {
 				return err
 			}
 		}
 	case *ast.MapLiteral:
 		for _, l := range e.PropertyKeyNames {
-			if err := runtime.evalExpr(scope, clauseType, l.Expr); err != nil {
+			if err := runtime.evalExpr(scope, l.Expr); err != nil {
 				return err
 			}
 		}
 	case *ast.PropertyLabelsExpr:
-		if err := runtime.evalExpr(scope, clauseType, e.Atom); err != nil {
+		if err := runtime.evalExpr(scope, e.Atom); err != nil {
 			return err
 		}
 	case *ast.Parameter:
 	case *ast.CaseExpr:
-		if err := runtime.evalExpr(scope, clauseType, e.Init); err != nil {
+		if err := runtime.evalExpr(scope, e.Init); err != nil {
 			return err
 		}
-		if err := runtime.evalExpr(scope, clauseType, e.Else); err != nil {
+		if err := runtime.evalExpr(scope, e.Else); err != nil {
 			return err
 		}
 		for _, alt := range e.Alternatives {
-			if err := runtime.evalExpr(scope, clauseType, alt.Then); err != nil {
+			if err := runtime.evalExpr(scope, alt.Then); err != nil {
 				return err
 			}
-			if err := runtime.evalExpr(scope, clauseType, alt.When); err != nil {
+			if err := runtime.evalExpr(scope, alt.When); err != nil {
 				return err
 			}
 		}
 	case *ast.ListComprehensionExpr:
-		if err := runtime.evalExpr(scope, clauseType, e.Expr); err != nil {
+		if err := runtime.evalExpr(scope, e.Expr); err != nil {
 			return err
 		}
-		if err := runtime.evalExpr(scope, clauseType, e.FilterExpr); err != nil {
+		if err := runtime.evalExpr(scope, e.FilterExpr); err != nil {
 			return err
 		}
 	case *ast.FilterExpr:
 		if err := runtime.bindVariable(scope, e.Variable); err != nil {
 			return err
 		}
-		if err := runtime.evalExpr(scope, clauseType, e.InExpr); err != nil {
+		if err := runtime.evalExpr(scope, e.InExpr); err != nil {
 			return err
 		}
-		if err := runtime.evalExpr(scope, clauseType, e.WhereExpr); err != nil {
+		if err := runtime.evalExpr(scope, e.WhereExpr); err != nil {
 			return err
 		}
 	case *ast.QuantifierExpr:
-		if err := runtime.evalExpr(scope, clauseType, e.Expr); err != nil {
+		if err := runtime.evalExpr(scope, e.Expr); err != nil {
 			return err
 		}
 	case *ast.VariableExpr:
@@ -334,35 +372,35 @@ func (runtime *astRuntime) evalExpr(scope *scope, clauseType int, expr ast.Expr)
 			return cypher.NewUndefinedVariableErr(id)
 		}
 	case *ast.PatternComprehensionExpr:
-		if err := runtime.evalExpr(scope, clauseType, e.WhereExpr); err != nil {
+		if err := runtime.evalExpr(scope, e.WhereExpr); err != nil {
 			return err
 		}
-		if err := runtime.evalExpr(scope, clauseType, e.PipeExpr); err != nil {
+		if err := runtime.evalExpr(scope, e.PipeExpr); err != nil {
 			return err
 		}
-		if err := runtime.evalExpr(scope, clauseType, e.ReltionshipsPattern); err != nil {
+		if err := runtime.evalExpr(scope, e.ReltionshipsPattern); err != nil {
 			return err
 		}
 	case *ast.RelationshipsPattern:
-		if err := runtime.evalNodePattern(scope, clauseType, e.Left); err != nil {
+		if err := runtime.evalNodePattern(scope, e.Left); err != nil {
 			return err
 		}
 		for _, chain := range e.Chain {
-			if err := runtime.evalPatternElementChain(scope, clauseType, chain); err != nil {
+			if err := runtime.evalPatternElementChain(scope, chain); err != nil {
 				return err
 			}
 		}
 	case *ast.FunctionInvocation:
 		for _, arg := range e.Args {
-			if err := runtime.evalExpr(scope, clauseType, arg); err != nil {
+			if err := runtime.evalExpr(scope, arg); err != nil {
 				return err
 			}
 		}
 	case *ast.ListOperatorExpr:
-		if err := runtime.evalExpr(scope, clauseType, e.Expr); err != nil {
+		if err := runtime.evalExpr(scope, e.Expr); err != nil {
 			return err
 		}
-		if err := runtime.evalExpr(scope, clauseType, e.EndExpr); err != nil {
+		if err := runtime.evalExpr(scope, e.EndExpr); err != nil {
 			return err
 		}
 	default:
