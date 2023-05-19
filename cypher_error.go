@@ -58,6 +58,6 @@ func NewCreatingVarLength() error {
 func NewInvalidParameterUse() error {
 	return &CypherErr{
 		Msg:  fmt.Sprintf("invalid parameter use"),
-		Code: CreatingVarLength,
+		Code: InvalidParameterUse,
 	}
 }
