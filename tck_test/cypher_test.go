@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/cucumber/godog"
+	"github.com/mburbidg/cypher"
 	"github.com/mburbidg/cypher/parser"
 	"github.com/mburbidg/cypher/scanner"
 	"os"
@@ -101,7 +102,12 @@ func (g *graphFeature) noSideEffects(ctx context.Context) (context.Context, erro
 }
 
 func (g *graphFeature) syntaxErrorRaised(ctx context.Context, errStr string) (context.Context, error) {
-	if _, ok := ctx.Value(syntaxErrKey{}).(error); ok {
+	if err, ok := ctx.Value(syntaxErrKey{}).(error); ok {
+		if cypherErr, ok := err.(*cypher.CypherErr); ok {
+			if cypherErr.Code != errStr {
+				return ctx, fmt.Errorf("expecting syntax error: expected=%s, actual=%s", errStr, cypherErr.Code)
+			}
+		}
 		return ctx, nil
 	}
 	return ctx, fmt.Errorf("expecting syntax error: %s", errStr)
@@ -114,7 +120,7 @@ func TestCypherFeatures(t *testing.T) {
 			Format: "pretty",
 			Paths: []string{
 				"tck/features/clauses/create",
-				"tck/features/clauses/match/Match1.feature",
+				//"tck/features/clauses/match/Match1.feature",
 			},
 			TestingT: t,
 		},

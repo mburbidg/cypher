@@ -15,11 +15,13 @@ const (
 	updatingClause
 	matchClause
 	createClause
+	mergeClause
 )
 
 type scope struct {
 	clauseType   int
 	clauseDetail int
+	creatingNode bool
 	symbolTable  map[string]any
 	prev         *scope
 }
@@ -28,6 +30,7 @@ func newScope(prev *scope) *scope {
 	return &scope{
 		clauseType:   none,
 		clauseDetail: none,
+		creatingNode: false,
 		symbolTable:  map[string]any{},
 		prev:         prev,
 	}
@@ -97,6 +100,7 @@ func (runtime *astRuntime) evalSinglePartQuery(scope *scope, tree *ast.SinglePar
 func (runtime *astRuntime) evalReadingClause(scope *scope, tree []ast.ReadingClause) error {
 	log.Printf("evaluating reading clause")
 	scope.clauseType = readingClause
+	defer func() { scope.clauseType = none }()
 	for _, clause := range tree {
 		switch c := clause.(type) {
 		case *ast.MatchClause:
@@ -112,6 +116,7 @@ func (runtime *astRuntime) evalReadingClause(scope *scope, tree []ast.ReadingCla
 func (runtime *astRuntime) evalUpdatingClause(scope *scope, tree []ast.UpdatingClause) error {
 	log.Printf("evaluating updating clause")
 	scope.clauseType = updatingClause
+	defer func() { scope.clauseType = none }()
 	for _, clause := range tree {
 		switch c := clause.(type) {
 		case *ast.CreateClause:
@@ -127,6 +132,7 @@ func (runtime *astRuntime) evalUpdatingClause(scope *scope, tree []ast.UpdatingC
 func (runtime *astRuntime) evalMatchClause(scope *scope, tree *ast.MatchClause) error {
 	log.Printf("evaluating match clause")
 	scope.clauseDetail = matchClause
+	defer func() { scope.clauseDetail = none }()
 	for _, p := range tree.Pattern.Parts {
 		err := runtime.evalPatternPart(scope, p)
 		if err != nil {
@@ -139,6 +145,7 @@ func (runtime *astRuntime) evalMatchClause(scope *scope, tree *ast.MatchClause) 
 func (runtime *astRuntime) evalCreateClause(scope *scope, tree *ast.CreateClause) error {
 	log.Printf("evaluating create clause")
 	scope.clauseDetail = createClause
+	defer func() { scope.clauseDetail = none }()
 	for _, p := range tree.Pattern.Parts {
 		err := runtime.evalPatternPart(scope, p)
 		if err != nil {
@@ -159,6 +166,10 @@ func (runtime *astRuntime) evalPatternPart(scope *scope, part *ast.PatternPart) 
 func (runtime *astRuntime) evalPatternElement(scope *scope, elem ast.PatternElement) error {
 	switch elem := elem.(type) {
 	case *ast.PatternElementPattern:
+		if (scope.clauseDetail == createClause || scope.clauseDetail == mergeClause) && len(elem.Chain) == 0 {
+			scope.creatingNode = true
+		}
+		defer func() { scope.creatingNode = false }()
 		err := runtime.evalPatternElementPattern(scope, elem)
 		if err != nil {
 			return err
@@ -199,9 +210,16 @@ func (runtime *astRuntime) evalNodePattern(scope *scope, pattern *ast.NodePatter
 		if err := runtime.bindVariable(scope, pattern.Variable); err != nil {
 			return err
 		}
-		if err := runtime.evalProperties(scope, pattern.Properties); err != nil {
-			return err
-		}
+		//if scope.creatingNode {
+		//	if err := runtime.bindVariable(scope, pattern.Variable); err != nil {
+		//		return err
+		//	}
+		//} else {
+		//	runtime.getOrBindVariable(scope, pattern.Variable)
+		//}
+		//if err := runtime.evalProperties(scope, pattern.Properties); err != nil {
+		//	return err
+		//}
 	}
 	return nil
 }
@@ -367,10 +385,7 @@ func (runtime *astRuntime) evalExpr(scope *scope, expr ast.Expr) error {
 			return err
 		}
 	case *ast.VariableExpr:
-		id := runtime.getIdentifier(e.SymbolicName)
-		if _, ok := scope.symbolTable[id]; !ok {
-			return cypher.NewUndefinedVariableErr(id)
-		}
+		return runtime.expectVariable(scope, e.SymbolicName)
 	case *ast.PatternComprehensionExpr:
 		if err := runtime.evalExpr(scope, e.WhereExpr); err != nil {
 			return err
@@ -428,6 +443,23 @@ func (runtime *astRuntime) bindVariable(scope *scope, symbolicName ast.SymbolicN
 			return cypher.NewVariableAlreadyBoundErr(id)
 		}
 		scope.symbolTable[id] = true
+	}
+	return nil
+}
+
+func (runtime *astRuntime) getOrBindVariable(scope *scope, symbolicName ast.SymbolicName) bool {
+	id := runtime.getIdentifier(symbolicName)
+	if _, ok := scope.symbolTable[id]; ok {
+		return true
+	}
+	_ = runtime.bindVariable(scope, symbolicName)
+	return false
+}
+
+func (runtime *astRuntime) expectVariable(scope *scope, symbolicName ast.SymbolicName) error {
+	id := runtime.getIdentifier(symbolicName)
+	if _, ok := scope.symbolTable[id]; !ok {
+		return cypher.NewUndefinedVariableErr(id)
 	}
 	return nil
 }
