@@ -71,13 +71,16 @@ type astRuntime struct {
 }
 
 func (runtime *astRuntime) eval(stmt parser.Statement) error {
-	switch tree := stmt.AST.(type) {
-	case *ast.SinglePartQuery:
-		return runtime.evalSinglePartQuery(newScope(nil), tree)
-	default:
-		return fmt.Errorf("query not implemented")
-	}
-	return nil
+	v := newASTVisitor()
+	err := stmt.AST.Accept(v)
+	return err
+	//switch tree := stmt.AST.(type) {
+	//case *ast.SinglePartQuery:
+	//	return runtime.evalSinglePartQuery(newScope(nil), tree)
+	//default:
+	//	return fmt.Errorf("query not implemented")
+	//}
+	//return nil
 }
 
 func (runtime *astRuntime) evalSinglePartQuery(scope *scope, tree *ast.SinglePartQuery) error {

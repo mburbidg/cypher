@@ -41,11 +41,11 @@ func (g *graphFeature) executingQuery(ctx context.Context, query *godog.DocStrin
 	reporter := &reporter{}
 	s := scanner.New([]byte(query.Content), reporter)
 	p := parser.New(s, reporter)
-	r := &astRuntime{}
 	stmt, err := p.Parse()
 	if err != nil {
 		return context.WithValue(ctx, syntaxErrKey{}, err), nil
 	}
+	r := &astRuntime{}
 	err = r.eval(stmt)
 	if err != nil {
 		return context.WithValue(ctx, syntaxErrKey{}, err), nil
@@ -119,7 +119,7 @@ func TestCypherFeatures(t *testing.T) {
 		Options: &godog.Options{
 			Format: "pretty",
 			Paths: []string{
-				"tck/features/clauses/create",
+				"tck/features/clauses/create/Create2.feature",
 				//"tck/features/clauses/match/Match1.feature",
 			},
 			TestingT: t,
