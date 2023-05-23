@@ -225,7 +225,7 @@ func (p *Parser) projectionItem() (*ast.ProjectionItem, error) {
 	return &ast.ProjectionItem{Expr: expr, Variable: variable}, nil
 }
 
-func (p *Parser) order() ([]*ast.SortItem, error) {
+func (p *Parser) order() (*ast.SortOrder, error) {
 	if _, ok, err := p.matchPhrase(scanner.Order, scanner.By); err != nil {
 		return nil, err
 	} else if !ok {
@@ -243,7 +243,7 @@ func (p *Parser) order() ([]*ast.SortItem, error) {
 		if _, ok, err := p.match(scanner.Comma); err != nil {
 			return nil, err
 		} else if !ok {
-			return items, nil
+			return &ast.SortOrder{items}, nil
 		}
 		item, err := p.sortItem()
 		if err != nil {
@@ -1522,10 +1522,10 @@ func (p *Parser) mapLiteral() (ast.Expr, error) {
 	} else if !ok {
 		return nil, nil
 	}
-	literal := &ast.MapLiteral{PropertyKeyNames: []*ast.PropertyKeyNames{}}
+	literal := &ast.MapLiteral{PropertyKeyNames: []*ast.PropertyKeyName{}}
 	for {
 		var err error
-		pkn := &ast.PropertyKeyNames{}
+		pkn := &ast.PropertyKeyName{}
 		pkn.Name, err = p.schemaName()
 		if err != nil {
 			return nil, err
