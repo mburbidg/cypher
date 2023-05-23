@@ -140,7 +140,7 @@ func (p *PatternElementPattern) Accept(visitor Visitor) error {
 			return err
 		}
 	}
-	return visitor.VisitPatternElementPatternEnter(p)
+	return visitor.VisitPatternElementPatternLeave(p)
 }
 
 type PatternPart struct {
@@ -203,7 +203,7 @@ func (p *ProjectionItems) Accept(visitor Visitor) error {
 			return err
 		}
 	}
-	return visitor.VisitProjectionItemsEnter(p)
+	return visitor.VisitProjectionItemsLeave(p)
 }
 
 type ProjectionItem struct {
@@ -223,7 +223,7 @@ func (p *ProjectionItem) Accept(visitor Visitor) error {
 			return err
 		}
 	}
-	return visitor.VisitProjectionItemEnter(p)
+	return visitor.VisitProjectionItemLeave(p)
 }
 
 type SortOrder struct {
@@ -325,7 +325,7 @@ func (expr *TernaryExpr) Accept(visitor Visitor) error {
 	if err := expr.E3.Accept(visitor); err != nil {
 		return err
 	}
-	return visitor.VisitTernaryExprEnter(expr)
+	return visitor.VisitTernaryExprLeave(expr)
 }
 
 type ListExpr struct {
@@ -513,7 +513,7 @@ func (expr *CaseExpr) Accept(visitor Visitor) error {
 	if err := expr.Else.Accept(visitor); err != nil {
 		return err
 	}
-	return visitor.VisitCaseExprEnter(expr)
+	return visitor.VisitCaseExprLeave(expr)
 }
 
 type CaseAltNode struct {
@@ -546,7 +546,7 @@ func (quantifier *QuantifierExpr) Accept(visitor Visitor) error {
 	if err := quantifier.Expr.Accept(visitor); err != nil {
 		return err
 	}
-	return visitor.VisitQuantifierExprEnter(quantifier)
+	return visitor.VisitQuantifierExprLeave(quantifier)
 }
 
 type FilterExpr struct {
@@ -582,7 +582,7 @@ func (expr *VariableExpr) Accept(visitor Visitor) error {
 	if err := expr.SymbolicName.Accept(visitor); err != nil {
 		return err
 	}
-	return visitor.VisitVariableExprEnter(expr)
+	return visitor.VisitVariableExprLeave(expr)
 }
 
 type PatternComprehensionExpr struct {
@@ -636,7 +636,7 @@ func (pattern *NodePattern) Accept(visitor Visitor) error {
 			return err
 		}
 	}
-	return visitor.VisitNodePatternEnter(pattern)
+	return visitor.VisitNodePatternLeave(pattern)
 }
 
 type MapLiteral struct {
@@ -670,7 +670,7 @@ func (name *PropertyKeyName) Accept(visitor Visitor) error {
 	if err := name.Expr.Accept(visitor); err != nil {
 		return err
 	}
-	return visitor.VisitPropertyKeyNameEnter(name)
+	return visitor.VisitPropertyKeyNameLeave(name)
 }
 
 type Properties struct {
@@ -692,7 +692,7 @@ func (props *Properties) Accept(visitor Visitor) error {
 			return err
 		}
 	}
-	return visitor.VisitPropertiesEnter(props)
+	return visitor.VisitPropertiesLeave(props)
 }
 
 type RelationshipsPattern struct {
@@ -712,7 +712,7 @@ func (pattern *RelationshipsPattern) Accept(visitor Visitor) error {
 			return err
 		}
 	}
-	return visitor.VisitRelationshipsPatternEnter(pattern)
+	return visitor.VisitRelationshipsPatternLeave(pattern)
 }
 
 type PatternElementChain struct {
@@ -730,7 +730,7 @@ func (chain *PatternElementChain) Accept(visitor Visitor) error {
 	if err := chain.Right.Accept(visitor); err != nil {
 		return err
 	}
-	return visitor.VisitPatternElementChainEnter(chain)
+	return visitor.VisitPatternElementChainLeave(chain)
 }
 
 type RelationshipPattern struct {
@@ -854,7 +854,7 @@ func (expr *ListOperatorExpr) Accept(visitor Visitor) error {
 	if err := expr.EndExpr.Accept(visitor); err != nil {
 		return err
 	}
-	return visitor.VisitListOperatorExprEnter(expr)
+	return visitor.VisitListOperatorExprLeave(expr)
 }
 
 type ExistsFunctionName struct{}

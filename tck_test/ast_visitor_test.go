@@ -8,13 +8,16 @@ import (
 )
 
 type astVisitor struct {
-	inPattern   bool
-	inMatch     bool
-	inCreate    bool
-	inNode      bool
-	inExpr      bool
-	relTypeCnt  int
-	symbolTable map[string]any
+	inPattern    bool
+	inMatch      bool
+	inCreate     bool
+	inNode       bool
+	inRel        bool
+	inExpr       bool
+	creatingNode bool
+	hasProps     bool
+	hasLabels    bool
+	symbolTable  map[string]any
 }
 
 func newASTVisitor() ast.Visitor {
@@ -109,11 +112,15 @@ func (visitor *astVisitor) VisitPatternElementNestedLeave(part *ast.PatternEleme
 
 func (visitor *astVisitor) VisitPatternElementPatternEnter(part *ast.PatternElementPattern) error {
 	log.Printf("Enter PatternElementPattern\n")
+	if visitor.inCreate && len(part.Chain) == 0 {
+		visitor.creatingNode = true
+	}
 	return nil
 }
 
 func (visitor *astVisitor) VisitPatternElementPatternLeave(part *ast.PatternElementPattern) error {
 	log.Printf("Leave PatternElementPattern\n")
+	visitor.creatingNode = false
 	return nil
 }
 
@@ -265,13 +272,34 @@ func (visitor *astVisitor) visitSymbolicName(id string) error {
 		if _, ok := visitor.symbolTable[id]; !ok {
 			return cypher.NewUndefinedVariableErr(id)
 		}
-	case visitor.inPattern && visitor.inNode:
+	case visitor.inRel:
 		if _, ok := visitor.symbolTable[id]; ok {
 			return cypher.NewVariableAlreadyBoundErr(id)
 		}
 		visitor.symbolTable[id] = true
+	case visitor.inNode:
+		if visitor.creatingNode {
+			if _, ok := visitor.symbolTable[id]; ok {
+				return cypher.NewVariableAlreadyBoundErr(id)
+			}
+			visitor.symbolTable[id] = true
+		} else if visitor.inCreate {
+			if visitor.hasProps || visitor.hasLabels {
+				if _, ok := visitor.symbolTable[id]; ok {
+					return cypher.NewVariableAlreadyBoundErr(id)
+				}
+			}
+		}
+		visitor.getOrBind(id)
 	}
 	return nil
+}
+
+func (visitor *astVisitor) getOrBind(id string) {
+	if _, ok := visitor.symbolTable[id]; ok {
+		return
+	}
+	visitor.symbolTable[id] = true
 }
 
 func (visitor *astVisitor) VisitReservedWord(word *ast.ReservedWord) error {
@@ -374,12 +402,16 @@ func (visitor *astVisitor) VisitPatternComprehensionExprLeave(expr *ast.PatternC
 func (visitor *astVisitor) VisitNodePatternEnter(pattern *ast.NodePattern) error {
 	log.Printf("Enter NodePattern\n")
 	visitor.inNode = true
+	if len(pattern.Labels) > 0 {
+		visitor.hasLabels = true
+	}
 	return nil
 }
 
 func (visitor *astVisitor) VisitNodePatternLeave(pattern *ast.NodePattern) error {
 	log.Printf("Leave NodePattern\n")
 	visitor.inNode = false
+	visitor.hasLabels = false
 	return nil
 }
 
@@ -405,11 +437,15 @@ func (visitor *astVisitor) VisitPropertyKeyNameLeave(name *ast.PropertyKeyName) 
 
 func (visitor *astVisitor) VisitPropertiesEnter(props *ast.Properties) error {
 	log.Printf("Enter Properties\n")
+	if len(props.MapLiteral.PropertyKeyNames) > 0 {
+		visitor.hasProps = true
+	}
 	return nil
 }
 
 func (visitor *astVisitor) VisitPropertiesLeave(props *ast.Properties) error {
 	log.Printf("Leave Properties\n")
+	visitor.hasProps = false
 	return nil
 }
 
@@ -435,7 +471,7 @@ func (visitor *astVisitor) VisitPatternElementChainLeave(chain *ast.PatternEleme
 
 func (visitor *astVisitor) VisitRelationshipPatternEnter(pattern *ast.RelationshipPattern) error {
 	log.Printf("Enter RelationshipPattern\n")
-	visitor.relTypeCnt = 0
+	visitor.inRel = true
 	if visitor.inCreate {
 		if pattern.Right == ast.Undirected && pattern.Left == ast.Undirected {
 			return cypher.NewRequiresDirectedRelationship()
@@ -443,30 +479,38 @@ func (visitor *astVisitor) VisitRelationshipPatternEnter(pattern *ast.Relationsh
 		if pattern.Right == ast.Directed && pattern.Left == ast.Directed {
 			return cypher.NewRequiresDirectedRelationship()
 		}
+		if pattern.RelationshipDetail == nil {
+			return cypher.NewNoSingleRelationshipType()
+		}
 	}
 	return nil
 }
 
 func (visitor *astVisitor) VisitRelationshipPatternLeave(pattern *ast.RelationshipPattern) error {
 	log.Printf("Leave RelationshipPattern\n")
-	defer func() { visitor.relTypeCnt = 0 }()
-	if visitor.relTypeCnt != 1 {
-		return cypher.NewNoSingleRelationshipType()
-	}
+	visitor.inRel = false
 	return nil
 }
 
 func (visitor *astVisitor) VisitRelationshipDetailEnter(detail *ast.RelationshipDetail) error {
 	log.Printf("Enter RelationshipDetail\n")
-	visitor.relTypeCnt += len(detail.RelationshipTypes)
-	if visitor.inCreate && detail.RangeLiteral != nil {
-		return cypher.NewCreatingVarLength()
+	visitor.inPattern = true
+	if visitor.inCreate {
+		if detail.RangeLiteral != nil {
+			return cypher.NewCreatingVarLength()
+		}
 	}
 	return nil
 }
 
 func (visitor *astVisitor) VisitRelationshipDetailLeave(detail *ast.RelationshipDetail) error {
 	log.Printf("Leave RelationshipDetail\n")
+	if visitor.inCreate {
+		if len(detail.RelationshipTypes) != 1 {
+			return cypher.NewNoSingleRelationshipType()
+		}
+	}
+	visitor.inPattern = false
 	return nil
 }
 

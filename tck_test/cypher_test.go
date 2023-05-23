@@ -119,7 +119,8 @@ func TestCypherFeatures(t *testing.T) {
 		Options: &godog.Options{
 			Format: "pretty",
 			Paths: []string{
-				"tck/features/clauses/create/Create2.feature",
+				//"debug.feature",
+				"tck/features/clauses/create",
 				//"tck/features/clauses/match/Match1.feature",
 			},
 			TestingT: t,
